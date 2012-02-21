@@ -1,0 +1,17 @@
+
+# Editor Files
+*~
+\#*\#
+
+# Eclipse Files
+.*project*
+
+# Python
+*.pyc
+*.pyo
+
+# Setuptools
+dist
+MANIFEST
+*egg-info*
+
