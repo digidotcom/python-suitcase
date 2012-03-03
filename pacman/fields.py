@@ -1,7 +1,8 @@
 import struct
 
+
 class FieldProperty(object):
-    
+
     def __init__(self, field, onget=None, onset=None):
         self.onget = onget
         self.onset = onset
@@ -27,6 +28,7 @@ class FieldProperty(object):
             onset = self._default_onset
 
         self.field.__set__(self.field, onset(value))
+
 
 class BaseField(object):
 

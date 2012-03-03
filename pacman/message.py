@@ -23,9 +23,12 @@ class Packer(object):
 
     def unpack(self, data):
         if len(data) != self.total_length:
-            raise ValueError, "Expected data to have length %s, had %s" % (self.total_length, len(data))
+            raise ValueError("Expected data to have length %s, had %s"
+                             % (self.total_length, len(data)))
         pos = 0
-        for (_name, field), length in izip(self.ordered_fields, self.ordered_field_lengths):
+        fields_with_lengths = izip(self.ordered_fields,
+                                   self.ordered_field_lengths)
+        for (_name, field), length in fields_with_lengths:
             new_pos = pos + length
             data_seg = data[pos:new_pos]
             pos = new_pos
@@ -40,8 +43,7 @@ class MessageMeta(type):
             if isinstance(value, BaseField):
                 cls._fields[key] = value
         sorted_fields = list(sorted(cls._fields.items(),
-                                   cmp=lambda (k1, v1), (k2, v2): cmp(v1._field_seqno,
-                                                                      v2._field_seqno)))
+                                    key=lambda (k, v): v._field_seqno))
         dct['_sorted_fields'] = sorted_fields
 
         # create a "packer" object for the message.  This is allows us
