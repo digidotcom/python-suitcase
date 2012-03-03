@@ -87,34 +87,34 @@ class BaseByteSequence(BaseField):
         self._value = struct.unpack(self.format, data)
 
 
-class BUByteSequence(BaseByteSequence):
+class UBByteSequence(BaseByteSequence):
     FORMAT_MODIFIER = lambda self, l: ">" + "B" * l
 
 
-class LUByteSequence(BaseByteSequence):
+class ULByteSequence(BaseByteSequence):
     FORMAT_MODIFIER = lambda self, l: "<" + "B" * l
 
 
 #===============================================================================
 # Unsigned Big Endian
 #===============================================================================
-class BUInt8(BaseStructField):
+class UBInt8(BaseStructField):
     FORMAT = ">B"
 
 
-class BUInt16(BaseStructField):
+class UBInt16(BaseStructField):
     FORMAT = ">H"
 
 
-class BUInt24(BaseStructField):
+class UBInt24(BaseStructField):
     FORMAT = ">BBB"
 
 
-class BUInt32(BaseStructField):
+class UBInt32(BaseStructField):
     FORMAT = ">I"
 
 
-class BUInt64(BaseStructField):
+class UBInt64(BaseStructField):
     FORMAT = ">Q"
 
 
@@ -140,19 +140,19 @@ class BInt64(BaseStructField):
 #===============================================================================
 # Unsigned Little Endian
 #===============================================================================
-class LUInt8(BaseStructField):
+class ULInt8(BaseStructField):
     FORMAT = "<B"
 
 
-class LUInt16(BaseStructField):
+class ULInt16(BaseStructField):
     FORMAT = "<H"
 
 
-class LUInt32(BaseStructField):
+class ULInt32(BaseStructField):
     FORMAT = "<I"
 
 
-class LUInt64(BaseStructField):
+class ULInt64(BaseStructField):
     FORMAT = "<Q"
 
 
