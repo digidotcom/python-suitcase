@@ -1,5 +1,6 @@
-Pacman
-------
+=============
+Pacman README
+=============
 
 Overview
 ========
