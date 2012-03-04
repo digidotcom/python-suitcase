@@ -1,5 +1,4 @@
 from pacman.fields import BaseField
-from itertools import izip
 try:
     from cStringIO import StringIO
 except ImportError:
@@ -7,32 +6,31 @@ except ImportError:
 
 
 class Packer(object):
+    """Object responsible for packing/unpacking bytes into/from fields"""
 
-    def __init__(self, ordered_fields):
+    def __init__(self, ordered_fields, relationships=()):
         self.ordered_fields = ordered_fields
-        self.ordered_field_lengths = [len(f) for _n, f in ordered_fields]
-        self.total_length = sum(self.ordered_field_lengths)
 
     def pack(self):
-        # use a StringIO with the right length, starting from the beginning
         sio = StringIO()
-
-        for _name, field in self.ordered_fields:
-            sio.write(field.pack())
+        self.write(sio)
         return sio.getvalue()
 
+    def write(self, stream):
+        # now, pack everything in
+        for _name, field in self.ordered_fields:
+            field._pack(stream)
+
     def unpack(self, data):
-        if len(data) != self.total_length:
-            raise ValueError("Expected data to have length %s, had %s"
-                             % (self.total_length, len(data)))
-        pos = 0
-        fields_with_lengths = izip(self.ordered_fields,
-                                   self.ordered_field_lengths)
-        for (_name, field), length in fields_with_lengths:
-            new_pos = pos + length
-            data_seg = data[pos:new_pos]
-            pos = new_pos
-            field.unpack(data_seg)
+        self.unpack_stream(StringIO(data))
+
+    def unpack_stream(self, stream):
+        # sanity checks
+        # if len(stream) < self.minimum_length:
+        #     raise ValueError("Expected data to have at least length %s, had %s"
+        #                      % (self.total_length, len(data)))
+        for _name, field in self.ordered_fields:
+            field._unpack(stream)
 
 
 class MessageMeta(type):

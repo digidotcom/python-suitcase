@@ -57,6 +57,10 @@ class FieldProperty(object):
 class BaseField(object):
     """Base class for all Field intances"""
 
+    # mark whether this field is fixed length or variable
+    # length (default: fixed)
+    _VARIABLE_LENGTH = False
+
     # record the number of instantiations of fields.  This is how
     # we can track the order of fields within a message
     _global_seqno = 0
@@ -76,28 +80,86 @@ class BaseField(object):
         self._value = value
 
 
-class BaseByteSequence(BaseField):
-    """Base byte sequence field"""
+class LengthField(BaseField):
 
-    def __init__(self, num_bytes):
+    def __init__(self, length_field):
         BaseField.__init__(self)
-        self.num_bytes = num_bytes
-        self.format = self.FORMAT_MODIFIER(num_bytes)
+        self.length_field = length_field
+        self.length_value_provider = None
+
+    def __repr__(self):
+        return repr(self.length_field)
 
     def __len__(self):
-        return self.num_bytes
+        return len(self.length_field)
 
-    def pack(self):
-        return struct.pack(self.format, *self._value)
+    def __get__(self, obj, objtype=None):
+        return self.length_field.__get__(obj, objtype)
 
-    def unpack(self, data):
-        self._value = struct.unpack(self.format, data)
+    def __set__(self, obj, value):
+        raise AttributeError("Cannot set the value of a LengthField")
+
+    def associate_length_consumer(self, target_field):
+        def _length_value_provider():
+            return len(target_field.__get__(target_field))
+        self.length_value_provider = _length_value_provider
+
+    def _pack(self, stream):
+        if self.length_value_provider is None:
+            raise Exception("No length_provider added to this LengthField")
+        self.length_field._value = self.length_value_provider()
+        self.length_field._pack(stream)
+
+    def _unpack(self, stream):
+        return self.length_field._unpack(stream)
+
+
+class VariableRawPayload(BaseField):
+    """Variable length raw (byte string) field"""
+
+    def __init__(self, length_provider):
+        BaseField.__init__(self)
+        self.length_provider = length_provider
+        self.length_provider.associate_length_consumer(self)
+
+    def _pack(self, stream):
+        stream.write(self._value)
+
+    def _unpack(self, stream):
+        length = self.length_provider.__get__(self.length_provider)
+        self._value = stream.read(length)
+
+
+class BaseVariableByteSequence(BaseField):
+    """Base variable-length byte sequence field"""
+    _VARIABLE_LENGTH = True
+
+    def __init__(self, length_field=None, length_function=None):
+        BaseField.__init__(self)
+
+
+class BaseFixedByteSequence(BaseField):
+    """Base fixed-length byte sequence field"""
+
+    def __init__(self, size):
+        BaseField.__init__(self)
+        self.size = size
+        self.format = self.FORMAT_MODIFIER(size)
+
+    def __len__(self):
+        return self.size
+
+    def _pack(self, stream):
+        stream.write(struct.pack(self.format, *self._value))
+
+    def _unpack(self, stream):
+        self._value = struct.unpack(self.format, stream.read(self.size))
 
 
 # NOTE: on bytes (uint8) these are actually really the same thing.  We
 # leave as is for a consistent interface
-class UBByteSequence(BaseByteSequence):
-    """Provide access to a sequence of unsigned bytes
+class UBInt8Sequence(BaseFixedByteSequence):
+    """Provide access to a sequence of unsigned bytes (fixed length)
 
     Example::
 
@@ -116,7 +178,7 @@ class UBByteSequence(BaseByteSequence):
     FORMAT_MODIFIER = lambda self, l: ">" + "B" * l
 
 
-class ULByteSequence(BaseByteSequence):
+class ULInt8Sequence(BaseFixedByteSequence):
     """Provide access to a sequnce of usnigned bytes"""
     FORMAT_MODIFIER = lambda self, l: "<" + "B" * l
 
@@ -127,15 +189,17 @@ class BaseStructField(BaseField):
     def __init__(self):
         BaseField.__init__(self)
         self._value = None
+        self._size = struct.calcsize(self.FORMAT)
 
     def __len__(self):
-        return struct.calcsize(self.FORMAT)
+        return self._size
 
-    def pack(self):
-        return struct.pack(self.FORMAT, self._value)
+    def _pack(self, stream):
+        stream.write(struct.pack(self.FORMAT, self._value))
 
-    def unpack(self, data):
+    def _unpack(self, stream):
         value = 0
+        data = stream.read(self._size)
         for i, byte in enumerate(reversed(struct.unpack(self.FORMAT, data))):
             value |= (byte << (i * 8))
         self._value = value
@@ -237,3 +301,15 @@ class SLInt64(BaseStructField):
     """Signed Little Endian 64-bit integer field"""
     FORMAT = "<q"
 
+#===============================================================================
+# Field Decorators
+# 
+# These decorate fields in different ways to change their behavior
+# in different ways
+#===============================================================================
+def _raise_attribute_error(*arg, **kwargs):
+    raise AttributeError
+
+def read_only(field):
+    field.__set__ = _raise_attribute_error
+    return field
