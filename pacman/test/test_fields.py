@@ -24,6 +24,7 @@ class TestFieldProperty(unittest.TestCase):
         self.assertEqual(msg._version, (22, 7))
         self.assertEqual(msg.version, "22.07")
 
+
 class TestLengthField(unittest.TestCase):
 
     class MyMuiltipliedLengthMessage(BaseMessage):
@@ -68,7 +69,7 @@ class TestLengthField(unittest.TestCase):
 
 class TestByteSequence(unittest.TestCase):
 
-    def test_bubyte_sequence(self):
+    def test_fixed_sequence(self):
         class MySeqMessage(BaseMessage):
             type = UBInt8()
             byte_values = UBInt8Sequence(16)
@@ -80,6 +81,24 @@ class TestByteSequence(unittest.TestCase):
         self.assertEqual(msg.pack(),
                          '\x00\x00\x01\x02\x03\x04\x05\x06\x07\x08'
                          '\t\n\x0b\x0c\r\x0e\x0f')
+
+    def test_variable_sequence(self):
+        class MyVarSeqMessage(BaseMessage):
+            type = UBInt8()
+            length = LengthField(UBInt8())
+            seq = UBInt8Sequence(length)
+
+        msg = MyVarSeqMessage()
+        msg.type = 0
+        msg.seq = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+        
+        self.assertEqual(msg.pack(), 
+                         '\x00\n\x01\x02\x03\x04\x05\x06\x07\x08\t\n')
+        msg2 = MyVarSeqMessage()
+        msg2.unpack(msg.pack())
+        self.assertEqual(msg2.length, 10)
+        self.assertEqual(msg2.seq, (1, 2, 3, 4, 5, 6, 7, 8, 9, 10))
+
 
 if __name__ == "__main__":
     unittest.main()

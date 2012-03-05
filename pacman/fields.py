@@ -143,7 +143,16 @@ class LengthField(BaseField):
 
 
 class VariableRawPayload(BaseField):
-    """Variable length raw (byte string) field"""
+    """Variable length raw (byte string) field
+
+    This field is expected to be used with a LengthField.  The variable
+    length field provides a value to be used by the LengthField on
+    message pack and vice-versa for unpack.
+
+    :param length_provider: The LengthField with which this variable
+        length payload is associated.
+
+    """
 
     def __init__(self, length_provider):
         BaseField.__init__(self)
@@ -159,19 +168,30 @@ class VariableRawPayload(BaseField):
 
 
 class BaseVariableByteSequence(BaseField):
-    """Base variable-length byte sequence field"""
 
-    def __init__(self, length_field=None, length_function=None):
+    def __init__(self, make_format, length_provider):
         BaseField.__init__(self)
+        self.make_format = make_format
+        self.length_provider = length_provider
+        self.length_provider._associate_length_consumer(self)
+
+    def _pack(self, stream):
+        sfmt = self.make_format(len(self._value))
+        stream.write(struct.pack(sfmt, *self._value))
+
+    def _unpack(self, stream):
+        length = self.length_provider.get_adjusted_length()
+        sfmt = self.make_format(length)
+        self._value = struct.unpack(sfmt, stream.read(length))
 
 
 class BaseFixedByteSequence(BaseField):
     """Base fixed-length byte sequence field"""
 
-    def __init__(self, size):
+    def __init__(self, make_format, size):
         BaseField.__init__(self)
         self.size = size
-        self.format = self.FORMAT_MODIFIER(size)
+        self.format = make_format(size)
 
     def __len__(self):
         return self.size
@@ -183,37 +203,24 @@ class BaseFixedByteSequence(BaseField):
         self._value = struct.unpack(self.format, stream.read(self.size))
 
 
-# NOTE: on bytes (uint8) these are actually really the same thing.  We
-# leave as is for a consistent interface
-class UBInt8Sequence(BaseFixedByteSequence):
-    """Provide access to a sequence of unsigned bytes (fixed length)
-
-    Example::
-
-        class MySeqMessage(BaseMessage):
-            type = UBInt8()
-            byte_values = UBByteSequence(16)
-
-        msg = MySeqMessage()
-        msg.type = 0
-        msg.byte_values = (0, 1, 2, 3, 4, 5, 6, 7, 8,
-                           9, 10, 11, 12, 13, 14, 15)
-        self.assertEqual(msg.pack(),
-                         '\\x00\\x00\\x01\\x02\\x03\\x04\\x05\\x06\\x07\\x08'
-                         '\\t\\n\\x0b\\x0c\\r\\x0e\\x0f')
-
-    """
-    FORMAT_MODIFIER = lambda self, l: ">" + "B" * l
+def byte_sequence_factory_factory(make_format):
+    def byte_sequence_factory(length_or_provider):
+        if hasattr(length_or_provider, 'get_adjusted_length'):
+            return BaseVariableByteSequence(make_format, length_or_provider)
+        else:
+            return BaseFixedByteSequence(make_format, length_or_provider)
+    return byte_sequence_factory
 
 
-class ULInt8Sequence(BaseFixedByteSequence):
-    """Provide access to a sequnce of usnigned bytes"""
-    FORMAT_MODIFIER = lambda self, l: "<" + "B" * l
+UBInt8Sequence = byte_sequence_factory_factory(lambda l: ">" + "B" * l)
+ULInt8Sequence = byte_sequence_factory_factory(lambda l: "<" + "B" * l)
+SBInt8Sequence = byte_sequence_factory_factory(lambda l: ">" + "b" * l)
+SLInt8Sequence = byte_sequence_factory_factory(lambda l: "<" + "b" * l)
 
 
 class BaseStructField(BaseField):
     """Base for fields based very directly on python struct module formats
-    
+
     It is expected that this class will be subclassed and customized by
     definining ``FORMAT`` at the class level.  ``FORMAT`` is expected to
     be a format string that could be used with struct.pack/unpack.  It
