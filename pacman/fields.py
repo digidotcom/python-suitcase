@@ -25,6 +25,17 @@ class FieldProperty(object):
         self.assertEqual(msg._version, (22, 7))
         self.assertEqual(msg.version, "22.07")
 
+    :param field: The field that is wrapped by this FieldProperty.  The value
+        of this field is passed into or set by the associated get/set fns.
+    :param onget: This is a function pointer to a function called to mutate
+        the value returned on field access.  The function receives a single
+        argument containing the value of the wrapped field.
+    :oaram onset: This is a functoin pointer to a function called to map
+        between the property and the underlying field.  The function takes
+        a single parameter which is the value the property was set to.  It
+        should return the value that the underlying field expects (or raise
+        an exception if appropriate).
+
     """
 
     def __init__(self, field, onget=None, onset=None):
@@ -56,10 +67,6 @@ class FieldProperty(object):
 
 class BaseField(object):
     """Base class for all Field intances"""
-
-    # mark whether this field is fixed length or variable
-    # length (default: fixed)
-    _VARIABLE_LENGTH = False
 
     # record the number of instantiations of fields.  This is how
     # we can track the order of fields within a message
@@ -134,6 +141,7 @@ class LengthField(BaseField):
     def get_adjusted_length(self):
         return self.__get__(self) * self.multiplier
 
+
 class VariableRawPayload(BaseField):
     """Variable length raw (byte string) field"""
 
@@ -152,7 +160,6 @@ class VariableRawPayload(BaseField):
 
 class BaseVariableByteSequence(BaseField):
     """Base variable-length byte sequence field"""
-    _VARIABLE_LENGTH = True
 
     def __init__(self, length_field=None, length_function=None):
         BaseField.__init__(self)
@@ -189,7 +196,8 @@ class UBInt8Sequence(BaseFixedByteSequence):
 
         msg = MySeqMessage()
         msg.type = 0
-        msg.byte_values = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
+        msg.byte_values = (0, 1, 2, 3, 4, 5, 6, 7, 8,
+                           9, 10, 11, 12, 13, 14, 15)
         self.assertEqual(msg.pack(),
                          '\\x00\\x00\\x01\\x02\\x03\\x04\\x05\\x06\\x07\\x08'
                          '\\t\\n\\x0b\\x0c\\r\\x0e\\x0f')
@@ -204,7 +212,17 @@ class ULInt8Sequence(BaseFixedByteSequence):
 
 
 class BaseStructField(BaseField):
-    """Base for fields based very directly on python struct module formats"""
+    """Base for fields based very directly on python struct module formats
+    
+    It is expected that this class will be subclassed and customized by
+    definining ``FORMAT`` at the class level.  ``FORMAT`` is expected to
+    be a format string that could be used with struct.pack/unpack.  It
+    should include endianess information.  If the ``FORMAT`` includes
+    multiple elements, the default ``_unpack`` logic assumes that each
+    element is a single byte and will OR these together.  To specialize
+    this, _unpack should be overriden.
+
+    """
 
     def __init__(self):
         BaseField.__init__(self)
@@ -320,16 +338,3 @@ class SLInt32(BaseStructField):
 class SLInt64(BaseStructField):
     """Signed Little Endian 64-bit integer field"""
     FORMAT = "<q"
-
-#===============================================================================
-# Field Decorators
-# 
-# These decorate fields in different ways to change their behavior
-# in different ways
-#===============================================================================
-def _raise_attribute_error(*arg, **kwargs):
-    raise AttributeError
-
-def read_only(field):
-    field.__set__ = _raise_attribute_error
-    return field
