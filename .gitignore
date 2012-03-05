@@ -15,3 +15,7 @@ dist
 MANIFEST
 *egg-info*
 
+# Buildout
+bin
+.buildout
+
