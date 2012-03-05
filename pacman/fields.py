@@ -81,27 +81,45 @@ class BaseField(object):
 
 
 class LengthField(BaseField):
+    """Wraps an existing field marking it as a LengthField
 
-    def __init__(self, length_field):
+    This field wraps another field which is assumed to return an
+    integer value.  A LengthField can be pointed to by a variable
+    length field and the two will be coupled appropriately.
+
+    :param length_field: The field providing the actual length value to
+        be used.  This field should return an integer value representing
+        the length (or a multiple of the length) as a return value
+    :param multiplier: If specified, this multiplier is applied to the
+        length.  If I specify a multiplier of 8, I am saying that each bit
+        in the length field represents 8 bytes of actual payload length. By
+        default the multiplier is 1 (1 bit/byte).
+
+    """
+
+    def __init__(self, length_field, multiplier=1):
         BaseField.__init__(self)
+        self.multiplier = multiplier
         self.length_field = length_field
         self.length_value_provider = None
 
     def __repr__(self):
         return repr(self.length_field)
 
-    def __len__(self):
-        return len(self.length_field)
-
     def __get__(self, obj, objtype=None):
-        return self.length_field.__get__(obj, objtype)
+        length_value = self.length_field.__get__(obj, objtype)
+        return length_value
 
     def __set__(self, obj, value):
         raise AttributeError("Cannot set the value of a LengthField")
 
-    def associate_length_consumer(self, target_field):
+    def _associate_length_consumer(self, target_field):
         def _length_value_provider():
-            return len(target_field.__get__(target_field))
+            target_field_length = len(target_field.__get__(target_field))
+            if not target_field_length % self.multiplier == 0:
+                raise ValueError("Payload length not divisible by %s"
+                                 % self.multiplier)
+            return (target_field_length / self.multiplier)
         self.length_value_provider = _length_value_provider
 
     def _pack(self, stream):
@@ -113,6 +131,8 @@ class LengthField(BaseField):
     def _unpack(self, stream):
         return self.length_field._unpack(stream)
 
+    def get_adjusted_length(self):
+        return self.__get__(self) * self.multiplier
 
 class VariableRawPayload(BaseField):
     """Variable length raw (byte string) field"""
@@ -120,13 +140,13 @@ class VariableRawPayload(BaseField):
     def __init__(self, length_provider):
         BaseField.__init__(self)
         self.length_provider = length_provider
-        self.length_provider.associate_length_consumer(self)
+        self.length_provider._associate_length_consumer(self)
 
     def _pack(self, stream):
         stream.write(self._value)
 
     def _unpack(self, stream):
-        length = self.length_provider.__get__(self.length_provider)
+        length = self.length_provider.get_adjusted_length()
         self._value = stream.read(length)
 
 
