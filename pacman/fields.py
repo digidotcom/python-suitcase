@@ -1,9 +1,15 @@
 import struct
 
 
-
-
 class FieldPlaceholder(object):
+    """Internally used object that holds information about a field schema
+
+    A FieldPlaceholder is what is actually instantiated and stored with
+    the message schema class when a message schema is declared.  The
+    placeholder stores all instantiation information needed to create
+    the fields when the message object is instantiated
+
+    """
 
     # record the number of instantiations of fields.  This is how
     # we can track the order of fields within a message
@@ -17,6 +23,7 @@ class FieldPlaceholder(object):
         self.kwargs = kwargs
 
     def create_instance(self, parent):
+        """Create an instance based off this placeholder with some parent"""
         self.kwargs['instantiate'] = True
         self.kwargs['parent'] = parent
         instance = self.cls(*self.args, **self.kwargs)
@@ -25,7 +32,27 @@ class FieldPlaceholder(object):
 
 
 class BaseField(object):
-    """Base class for all Field intances"""
+    """Base class for all Field instances
+
+    Some magic is used whenever a field is created normally in order to
+    allow for a declarative syntax without having to create explicit
+    factory methods/classes everywhere.  By default (for a normal call)
+    when a field is instantiated, it actually ends up returning a
+    FieldPlaceholder object containing information about the field
+    that has been declared.
+
+    To get an actual instance of the field, the call to the construction
+    must include a keyword argument ``instantiate`` that is set to some
+    truthy value.  Typically, this instantiation logic is done by
+    calling ``FieldPlaceholder.create_instance(parent)``.  This is the
+    recommended way to construct a field as it ensure all invariants
+    are in place (having a parent).
+
+    :param instantiate: Create an actual instance instead of a placeholder
+    :param parent: Specify the parent of this field (typically a BaseMessage
+        instace).
+
+    """
 
     def __new__(cls, *args, **kwargs):
         if kwargs.get('instantiate', False):
@@ -120,7 +147,24 @@ class FieldProperty(BaseField):
 
 
 class DispatchField(BaseField):
-    """Decorate a field as a dispatch byte (used as conditional)"""
+    """Decorate a field as a dispatch byte (used as conditional)
+
+    A DispatchField is always used with a DispatchTarget within the same
+    message (at some level).
+
+    Example::
+
+        class MyMessage(BaseMessage):
+            type = DispatchField(UBInt8())
+            body = DispatchTarget(dispatch_field = type, dispatch_mapping={
+                0x00: MessageType0,
+                0x01: MessageType1,
+            })
+
+    :param field: The field containing the dispatch parameter.  This is
+        typically an integer but could be any hashable object.
+
+    """
 
     def __init__(self, field, **kwargs):
         BaseField.__init__(self, **kwargs)
@@ -143,7 +187,26 @@ class DispatchField(BaseField):
 
 
 class DispatchTarget(BaseField):
-    """Represent a conditional branch on some DispatchField"""
+    """Represent a conditional branch on some DispatchField
+
+    Example::
+
+        class MyMessage(BaseMessage):
+            type = DispatchField(UBInt8())
+            body = DispatchTarget(dispatch_field = type, dispatch_mapping={
+                0x00: MessageType0,
+                0x01: MessageType1,
+            })
+
+    :param length_provider: The field providing a length value binding this
+        message (if any).  Set this field to None to leave unconstrained.
+    :param dispatch_field: The field being target for dispatch.  In most
+        protocols this is an integer type byte or something similar.  The
+        possible values for this field act as the keys for the dispatch.
+    :param dispatch_mapping: This is a dictionary mapping dispatch_field
+        values to associated message types to handle the remaining processing.
+
+    """
 
     def __init__(self, length_provider, dispatch_field,
                  dispatch_mapping, **kwargs):
@@ -292,7 +355,32 @@ class BaseVariableByteSequence(BaseField):
 
 
 class DependentField(BaseField):
-    """Field populated by container packet at lower level"""
+    """Field populated by container packet at lower level
+
+    It is sometimes the case that information from another layer of a
+    messaging protocol be needed at another higher-level of the protocol.
+    The DependentField is a way of declaring that a message at some layer
+    is dependent on a field with some name from the parent layer.
+
+    For instance, let's suppose that my protocol had an option byte that
+    I wanted to include in some logic handling packets at some higher
+    layer.  I could include that byte in my message as follows::
+
+        class MyDependentMessage(BaseMessage):
+            ll_options = DependentField('proto_options')
+            data = UBInt8Sequence(16)
+
+        class LowerLevelProtocol(BaseMessage):
+            type = DispatchField(UBInt16())
+            proto_options = UBInt8()
+            body = DispatchTarget(None, type, {
+                0x00: MyDependentMessage,
+            })
+
+    :params name: The name of the field from the parent message that we
+        would like brought into our message namespace.
+
+    """
 
     def __init__(self, name, **kwargs):
         BaseField.__init__(self, **kwargs)
