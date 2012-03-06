@@ -229,7 +229,7 @@ class DispatchTarget(BaseField):
 
         return target
 
-    def get(self):
+    def getval(self):
         return self._value
 
     def setval(self, value):
