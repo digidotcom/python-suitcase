@@ -71,10 +71,10 @@ class BaseField(object):
     def __repr__(self):
         return repr(self._value)
 
-    def __get__(self, obj, objtype=None):
+    def getval(self):
         return self._value
 
-    def __set__(self, obj, value):
+    def setval(self, value):
         self._value = value
 
 
@@ -127,17 +127,19 @@ class FieldProperty(BaseField):
     def _default_onset(self, value):
         return value
 
-    def __get__(self, obj, objtype=None):
+    def getval(self):
         onget = self.onget
-        value = self.field.__get__(self.field)
+        if onget is None:
+            onget = self._default_onget
+        value = self.field.getval()
         return onget(value)
 
-    def __set__(self, obj, value):
+    def setval(self, value):
         onset = self.onset
         if onset is None:
             onset = self._default_onset
 
-        self.field.__set__(self.field, onset(value))
+        self.field.setval(onset(value))
 
     def _unpack(self, stream):
         pass
@@ -170,11 +172,11 @@ class DispatchField(BaseField):
         BaseField.__init__(self, **kwargs)
         self.field = field.create_instance(self._parent)
 
-    def __get__(self, obj, objtype=None):
-        return self.field.__get__(self.field)
+    def getval(self):
+        return self.field.getval()
 
-    def __set__(self, obj, value):
-        return self.field.__set__(self.field, value)
+    def setval(self, value):
+        return self.field.setval(value)
 
     def __repr__(self):
         return repr(self.field)
@@ -220,17 +222,17 @@ class DispatchTarget(BaseField):
         self.length_provider._associate_length_consumer(self)
 
     def _lookup_msg_type(self):
-        target_key = self.dispatch_field.__get__(self.dispatch_field)
+        target_key = self.dispatch_field.getval()
         target = self.dispatch_mapping.get(target_key, None)
         if target is None:
             target = self.dispatch_mapping.get(None, None)
 
         return target
 
-    def __get__(self, obj, objtype=None):
+    def get(self):
         return self._value
 
-    def __set__(self, obj, value):
+    def setval(self, value):
         try:
             vtype = type(value)
             key = self.inverse_dispatch_mapping[vtype]
@@ -241,7 +243,7 @@ class DispatchTarget(BaseField):
         # type byte value
         self._value = value
         value._parent = self._parent
-        self.dispatch_field.__set__(self.dispatch_field, key)
+        self.dispatch_field.setval(key)
 
     def _pack(self, stream):
         return self._value._packer.write(stream)
@@ -249,7 +251,7 @@ class DispatchTarget(BaseField):
     def _unpack(self, stream):
         target_msg_type = self._lookup_msg_type()
         message_instance = target_msg_type()
-        self.__set__(self, message_instance)
+        self.setval(message_instance)
         self._value._packer.unpack_stream(stream)
 
 
@@ -279,11 +281,11 @@ class LengthField(BaseField):
     def __repr__(self):
         return repr(self.length_field)
 
-    def __get__(self, obj, objtype=None):
-        length_value = self.length_field.__get__(obj, objtype)
+    def getval(self):
+        length_value = self.length_field.getval()
         return length_value
 
-    def __set__(self, obj, value):
+    def setval(self, value):
         raise AttributeError("Cannot set the value of a LengthField")
 
     def _associate_length_consumer(self, target_field):
@@ -308,7 +310,7 @@ class LengthField(BaseField):
         return self.length_field._unpack(stream)
 
     def get_adjusted_length(self):
-        return self.__get__(self) * self.multiplier
+        return self.getval() * self.multiplier
 
 
 class VariableRawPayload(BaseField):
@@ -393,14 +395,14 @@ class DependentField(BaseField):
     def _unpack(self, stream):
         pass
 
-    def __get__(self, obj, obtype=None):
+    def getval(self):
         message_parent = self._parent._parent
         target_field = message_parent.lookup_field_by_name(
                             self.parent_field_name)
-        return target_field.__get__(obj)
+        return target_field.getval()
 
-    def __set__(self, obj, value):
-        return self.parent_field.__set__(obj, value)
+    def setval(self, value):
+        return self.parent_field.setval(value)
 
 
 class BaseFixedByteSequence(BaseField):

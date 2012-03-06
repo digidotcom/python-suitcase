@@ -76,14 +76,14 @@ class BaseMessage(object):
         k2f = self.__dict__.get('_key_to_field', {})
         if key in k2f:
             field = self._key_to_field[key]
-            return field.__get__(field)
+            return field.getval()
         raise AttributeError
 
     def __setattr__(self, key, value):
         k2f = self.__dict__.get('_key_to_field', {})
         if key in k2f:
             field = self._key_to_field[key]
-            return field.__set__(key, value)
+            return field.setval(value)
         return object.__setattr__(self, key, value)
 
     def __iter__(self):
