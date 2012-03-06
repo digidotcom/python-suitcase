@@ -1,4 +1,4 @@
-from pacman.fields import BaseField
+from pacman.fields import BaseField, DependentField
 try:
     from cStringIO import StringIO
 except ImportError:
@@ -40,6 +40,7 @@ class MessageMeta(type):
         for key, value in dct.iteritems():  # use a copy, we mutate dct
             if isinstance(value, BaseField):
                 cls._fields[key] = value
+
         sorted_fields = list(sorted(cls._fields.items(),
                                     key=lambda (k, v): v._field_seqno))
         dct['_sorted_fields'] = sorted_fields
@@ -58,6 +59,14 @@ class BaseMessage(object):
 
     __metaclass__ = MessageMeta
 
+    def __init__(self):
+        self._parent = None
+        for _key, field in self._sorted_fields:
+            field._associate_parent(self)
+
+    def _associate_parent(self, parent):
+        self._parent = parent
+
     def __iter__(self):
         return iter(self._sorted_fields)
 
@@ -67,6 +76,12 @@ class BaseMessage(object):
             output += "  %s=%s,\n" % (field_name, field)
         output += ")"
         return output
+
+    def lookup_field_by_name(self, name):
+        for fname, field in self:
+            if name == fname:
+                return field
+        raise KeyError
 
     def unpack(self, data):
         return self._packer.unpack(data)

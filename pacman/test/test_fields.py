@@ -1,6 +1,6 @@
 from pacman.fields import FieldProperty, UBInt8Sequence, UBInt8, \
     VariableRawPayload, LengthField, UBInt16, DispatchField, DispatchTarget, \
-    DependentField, SubMessageField
+    DependentField
 from pacman.message import BaseMessage
 import unittest
 
@@ -24,6 +24,23 @@ class TestFieldProperty(unittest.TestCase):
         msg.version = "22.7"
         self.assertEqual(msg._version, (22, 7))
         self.assertEqual(msg.version, "22.07")
+
+
+class BasicMessage(BaseMessage):
+    b1 = UBInt8()
+    b2 = UBInt8()
+
+
+class TestInstancePrototyping(unittest.TestCase):
+    
+    def test_independence(self):
+        msg1 = BasicMessage()
+        msg1.b1 = 10
+        msg1.b2 = 20
+        
+        msg2 = BasicMessage()
+        self.assertEqual(msg2.b1, None)
+        self.assertEqual(msg2.b2, None)
 
 
 class TestLengthField(unittest.TestCase):
@@ -102,15 +119,23 @@ class TestByteSequence(unittest.TestCase):
 
     
 class MyTargetMessage(BaseMessage):
-    length = LengthField(DependentField())
-    payload = VariableRawPayload(length)
+    # inherited from the parent message
+    _length = LengthField(DependentField('length'))
+    payload = VariableRawPayload(_length)
+
+
+class MyOtherTargetMessage(BaseMessage):
+    #: Inherited from the parent message
+    _length = LengthField(DependentField('length'))
+    sequence = UBInt8Sequence(_length)
 
 
 class MyBasicDispatchMessage(BaseMessage):
     type = DispatchField(UBInt8())
     length = LengthField(UBInt16())
     body = DispatchTarget(length, type, {
-        0x00: SubMessageField(MyTargetMessage)
+        0x00: MyTargetMessage,
+        0x01: MyOtherTargetMessage
     })
 
 
@@ -121,7 +146,21 @@ class TestMessageDispatching(unittest.TestCase):
         target_msg = MyTargetMessage()
         target_msg.payload = "Hello, world!"
         msg.body = target_msg
-        self.assertEqual(msg.pack(), "")
+        self.assertEqual(msg.pack(), "\x00\x00\rHello, world!")
+
+        msg2 = MyBasicDispatchMessage()
+        target_msg = MyOtherTargetMessage()
+        target_msg.sequence = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+        msg2.body = target_msg
+        self.assertEqual(msg2.pack(),
+            '\x01\x00\x0b\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n')
+
+    def test_dispatch_unpacking(self):
+        msg = MyBasicDispatchMessage()
+        msg.unpack("\x00\x00\rHello, world!")
+        self.assertEqual(msg.type, 0x00)
+        body = msg.body
+        self.assertEqual(body.payload, "Hello, world!")
 
 
 if __name__ == "__main__":

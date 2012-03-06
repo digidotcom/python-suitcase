@@ -75,7 +75,11 @@ class BaseField(object):
     def __init__(self):
         self._field_seqno = BaseField._global_seqno
         self._value = None
+        self._parent = None
         BaseField._global_seqno += 1
+
+    def _associate_parent(self, parent):
+        self._parent  = parent
 
     def __repr__(self):
         return repr(self._value)
@@ -118,19 +122,17 @@ class DispatchTarget(BaseField):
         self.length_provider = length_provider
         self.dispatch_field = dispatch_field
         self.dispatch_mapping = dispatch_mapping
-        self.inverse_dispatch_mapping = dict((v.__get__(v), k) for (k, v)
+        self.inverse_dispatch_mapping = dict((v, k) for (k, v)
                                              in dispatch_mapping.iteritems())
 
         self.length_provider._associate_length_consumer(self)
 
     def __get__(self, obj, objtype=None):
-        if self._value is not None:
-            target = self._value
-        else:
-            target_key = self.dispatch_field.__get__(self.dispatch_field)
-            target = self.dispatch_mapping.get(target_key, None)
-            if target is None:
-                target = self.dispatch_mapping.get(None, None)
+        target_key = self.dispatch_field.__get__(self.dispatch_field)
+        target = self.dispatch_mapping.get(target_key, None)
+        if target is None:
+            target = self.dispatch_mapping.get(None, None)
+
         return target
 
     def __set__(self, obj, value):
@@ -142,6 +144,7 @@ class DispatchTarget(BaseField):
 
         # OK, things check out.  Set both the value here and the
         # type byte value
+        value._associate_parent(self._parent)
         self._value = value
         self.dispatch_field.__set__(self.dispatch_field, key)
 
@@ -149,7 +152,8 @@ class DispatchTarget(BaseField):
         return self._value._packer.write(stream)
 
     def _unpack(self, stream):
-        return self._value._unpack(stream)
+        return self._value._packer.unpack_stream(stream)
+
 
 class LengthField(BaseField):
     """Wraps an existing field marking it as a LengthField
@@ -173,6 +177,10 @@ class LengthField(BaseField):
         self.multiplier = multiplier
         self.length_field = length_field
         self.length_value_provider = None
+
+    def _associate_parent(self, parent):
+        self._parent = parent
+        self.length_field._associate_parent(parent)
 
     def __repr__(self):
         return repr(self.length_field)
@@ -252,30 +260,26 @@ class BaseVariableByteSequence(BaseField):
         self._value = struct.unpack(sfmt, stream.read(length))
 
 
-class SubMessageField(BaseField):
-
-    def __init__(self, sub_message):
-        BaseField.__init__(self)
-        self.sub_message = sub_message
-
-    def __get__(self, obj, objtype=None):
-        return self.sub_message
-
-    def __set__(self, obj, value):
-        self.sub_message = value
-
-    def _pack(self, stream):
-        return self.sub_message._pack(stream)
-
-    def _unpack(self, stream):
-        return self.sub_message._unpack(stream)
-
-
 class DependentField(BaseField):
     """Field populated by container packet at lower level"""
 
-    def __init__(self):
+    def __init__(self, name):
         BaseField.__init__(self)
+        self.parent_field_name = name
+        self.parent_field = None
+
+    def _pack(self, stream):
+        pass
+
+    def _unpack(self, stream):
+        pass
+
+    def __get__(self, obj, obtype=None):
+        target_field = self._parent._parent.lookup_field_by_name(self.parent_field_name)
+        return target_field.__get__(obj)
+
+    def __set__(self, obj, value):
+        return self.parent_field.__set__(obj, value)
 
 
 class BaseFixedByteSequence(BaseField):
