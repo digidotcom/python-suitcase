@@ -1,7 +1,57 @@
 import struct
 
 
-class FieldProperty(object):
+
+
+class FieldPlaceholder(object):
+
+    # record the number of instantiations of fields.  This is how
+    # we can track the order of fields within a message
+    _global_seqno = 0
+
+    def __init__(self, cls, args, kwargs):
+        self._field_seqno = FieldPlaceholder._global_seqno
+        FieldPlaceholder._global_seqno += 1
+        self.cls = cls
+        self.args = args
+        self.kwargs = kwargs
+
+    def create_instance(self, parent):
+        self.kwargs['instantiate'] = True
+        self.kwargs['parent'] = parent
+        instance = self.cls(*self.args, **self.kwargs)
+        instance._field_seqno = self._field_seqno
+        return instance
+
+
+class BaseField(object):
+    """Base class for all Field intances"""
+
+    def __new__(cls, *args, **kwargs):
+        if kwargs.get('instantiate', False):
+            return object.__new__(cls, *args, **kwargs)
+        else:
+            return FieldPlaceholder(cls, args, kwargs)
+
+    def __init__(self, **kwargs):
+        self._value = None
+        self._parent = kwargs.get('parent')
+
+    def _ph2f(self, placeholder):
+        """Lookup a field given a field placeholder"""
+        return self._parent.lookup_field_by_placeholder(placeholder)
+
+    def __repr__(self):
+        return repr(self._value)
+
+    def __get__(self, obj, objtype=None):
+        return self._value
+
+    def __set__(self, obj, value):
+        self._value = value
+
+
+class FieldProperty(BaseField):
     """Provide the ability to define "Property" getter/setters for other fields
 
     This is useful and preferable and preferable to inheritance if you want
@@ -38,10 +88,11 @@ class FieldProperty(object):
 
     """
 
-    def __init__(self, field, onget=None, onset=None):
+    def __init__(self, field, onget=None, onset=None, **kwargs):
+        BaseField.__init__(self, **kwargs)
         self.onget = onget
         self.onset = onset
-        self.field = field
+        self.field = self._ph2f(field)
 
     def _default_onget(self, value):
         return value
@@ -51,9 +102,6 @@ class FieldProperty(object):
 
     def __get__(self, obj, objtype=None):
         onget = self.onget
-        if onget is None:
-            onget = self.onget
-
         value = self.field.__get__(self.field)
         return onget(value)
 
@@ -64,39 +112,19 @@ class FieldProperty(object):
 
         self.field.__set__(self.field, onset(value))
 
+    def _unpack(self, stream):
+        pass
 
-class BaseField(object):
-    """Base class for all Field intances"""
-
-    # record the number of instantiations of fields.  This is how
-    # we can track the order of fields within a message
-    _global_seqno = 0
-
-    def __init__(self):
-        self._field_seqno = BaseField._global_seqno
-        self._value = None
-        self._parent = None
-        BaseField._global_seqno += 1
-
-    def _associate_parent(self, parent):
-        self._parent  = parent
-
-    def __repr__(self):
-        return repr(self._value)
-
-    def __get__(self, obj, objtype=None):
-        return self._value
-
-    def __set__(self, obj, value):
-        self._value = value
+    def _pack(self, stream):
+        pass
 
 
 class DispatchField(BaseField):
     """Decorate a field as a dispatch byte (used as conditional)"""
 
-    def __init__(self, field):
-        BaseField.__init__(self)
-        self.field = field
+    def __init__(self, field, **kwargs):
+        BaseField.__init__(self, **kwargs)
+        self.field = field.create_instance(self._parent)
 
     def __get__(self, obj, objtype=None):
         return self.field.__get__(self.field)
@@ -117,23 +145,27 @@ class DispatchField(BaseField):
 class DispatchTarget(BaseField):
     """Represent a conditional branch on some DispatchField"""
 
-    def __init__(self, length_provider, dispatch_field, dispatch_mapping):
-        BaseField.__init__(self)
-        self.length_provider = length_provider
-        self.dispatch_field = dispatch_field
+    def __init__(self, length_provider, dispatch_field,
+                 dispatch_mapping, **kwargs):
+        BaseField.__init__(self, **kwargs)
+        self.length_provider = self._ph2f(length_provider)
+        self.dispatch_field = self._ph2f(dispatch_field)
         self.dispatch_mapping = dispatch_mapping
         self.inverse_dispatch_mapping = dict((v, k) for (k, v)
                                              in dispatch_mapping.iteritems())
 
         self.length_provider._associate_length_consumer(self)
 
-    def __get__(self, obj, objtype=None):
+    def _lookup_msg_type(self):
         target_key = self.dispatch_field.__get__(self.dispatch_field)
         target = self.dispatch_mapping.get(target_key, None)
         if target is None:
             target = self.dispatch_mapping.get(None, None)
 
         return target
+
+    def __get__(self, obj, objtype=None):
+        return self._value
 
     def __set__(self, obj, value):
         try:
@@ -144,15 +176,18 @@ class DispatchTarget(BaseField):
 
         # OK, things check out.  Set both the value here and the
         # type byte value
-        value._associate_parent(self._parent)
         self._value = value
+        value._parent = self._parent
         self.dispatch_field.__set__(self.dispatch_field, key)
 
     def _pack(self, stream):
         return self._value._packer.write(stream)
 
     def _unpack(self, stream):
-        return self._value._packer.unpack_stream(stream)
+        target_msg_type = self._lookup_msg_type()
+        message_instance = target_msg_type()
+        self.__set__(self, message_instance)
+        self._value._packer.unpack_stream(stream)
 
 
 class LengthField(BaseField):
@@ -172,15 +207,11 @@ class LengthField(BaseField):
 
     """
 
-    def __init__(self, length_field, multiplier=1):
-        BaseField.__init__(self)
+    def __init__(self, length_field, multiplier=1, **kwargs):
+        BaseField.__init__(self, **kwargs)
         self.multiplier = multiplier
-        self.length_field = length_field
+        self.length_field = length_field.create_instance(self._parent)
         self.length_value_provider = None
-
-    def _associate_parent(self, parent):
-        self._parent = parent
-        self.length_field._associate_parent(parent)
 
     def __repr__(self):
         return repr(self.length_field)
@@ -229,9 +260,9 @@ class VariableRawPayload(BaseField):
 
     """
 
-    def __init__(self, length_provider):
-        BaseField.__init__(self)
-        self.length_provider = length_provider
+    def __init__(self, length_provider, **kwargs):
+        BaseField.__init__(self, **kwargs)
+        self.length_provider = self._ph2f(length_provider)
         self.length_provider._associate_length_consumer(self)
 
     def _pack(self, stream):
@@ -244,10 +275,10 @@ class VariableRawPayload(BaseField):
 
 class BaseVariableByteSequence(BaseField):
 
-    def __init__(self, make_format, length_provider):
-        BaseField.__init__(self)
+    def __init__(self, make_format, length_provider, **kwargs):
+        BaseField.__init__(self, **kwargs)
         self.make_format = make_format
-        self.length_provider = length_provider
+        self.length_provider = self._ph2f(length_provider)
         self.length_provider._associate_length_consumer(self)
 
     def _pack(self, stream):
@@ -263,8 +294,8 @@ class BaseVariableByteSequence(BaseField):
 class DependentField(BaseField):
     """Field populated by container packet at lower level"""
 
-    def __init__(self, name):
-        BaseField.__init__(self)
+    def __init__(self, name, **kwargs):
+        BaseField.__init__(self, **kwargs)
         self.parent_field_name = name
         self.parent_field = None
 
@@ -275,7 +306,9 @@ class DependentField(BaseField):
         pass
 
     def __get__(self, obj, obtype=None):
-        target_field = self._parent._parent.lookup_field_by_name(self.parent_field_name)
+        message_parent = self._parent._parent
+        target_field = message_parent.lookup_field_by_name(
+                            self.parent_field_name)
         return target_field.__get__(obj)
 
     def __set__(self, obj, value):
@@ -285,8 +318,8 @@ class DependentField(BaseField):
 class BaseFixedByteSequence(BaseField):
     """Base fixed-length byte sequence field"""
 
-    def __init__(self, make_format, size):
-        BaseField.__init__(self)
+    def __init__(self, make_format, size, **kwargs):
+        BaseField.__init__(self, **kwargs)
         self.size = size
         self.format = make_format(size)
 
@@ -299,10 +332,10 @@ class BaseFixedByteSequence(BaseField):
 
 def byte_sequence_factory_factory(make_format):
     def byte_sequence_factory(length_or_provider):
-        if hasattr(length_or_provider, 'get_adjusted_length'):
-            return BaseVariableByteSequence(make_format, length_or_provider)
-        else:
+        if isinstance(length_or_provider, int):
             return BaseFixedByteSequence(make_format, length_or_provider)
+        else:
+            return BaseVariableByteSequence(make_format, length_or_provider)
     return byte_sequence_factory
 
 
@@ -325,8 +358,8 @@ class BaseStructField(BaseField):
 
     """
 
-    def __init__(self):
-        BaseField.__init__(self)
+    def __init__(self, **kwargs):
+        BaseField.__init__(self, **kwargs)
         self._value = None
         self._size = struct.calcsize(self.FORMAT)
 
@@ -341,9 +374,9 @@ class BaseStructField(BaseField):
         self._value = value
 
 
-#===============================================================================
+#==============================================================================
 # Unsigned Big Endian
-#===============================================================================
+#==============================================================================
 class UBInt8(BaseStructField):
     """Unsigned Big Endian 8-bit integer field"""
     FORMAT = ">B"
@@ -369,9 +402,9 @@ class UBInt64(BaseStructField):
     FORMAT = ">Q"
 
 
-#===============================================================================
+#==============================================================================
 # Signed Big Endian
-#===============================================================================
+#==============================================================================
 class SBInt8(BaseStructField):
     """Signed Big Endian 8-bit integer field"""
     FORMAT = ">b"
@@ -392,9 +425,9 @@ class SBInt64(BaseStructField):
     FORMAT = ">q"
 
 
-#===============================================================================
+#==============================================================================
 # Unsigned Little Endian
-#===============================================================================
+#==============================================================================
 class ULInt8(BaseStructField):
     """Unsigned Little Endian 8-bit integer field"""
     FORMAT = "<B"
@@ -415,9 +448,9 @@ class ULInt64(BaseStructField):
     FORMAT = "<Q"
 
 
-#===============================================================================
+#==============================================================================
 # Signed Little Endian
-#===============================================================================
+#==============================================================================
 class SLInt8(BaseStructField):
     """Signed Little Endian 8-bit integer field"""
     FORMAT = "<b"

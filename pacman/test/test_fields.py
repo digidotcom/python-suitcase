@@ -32,15 +32,18 @@ class BasicMessage(BaseMessage):
 
 
 class TestInstancePrototyping(unittest.TestCase):
-    
+
     def test_independence(self):
         msg1 = BasicMessage()
         msg1.b1 = 10
         msg1.b2 = 20
-        
+
         msg2 = BasicMessage()
-        self.assertEqual(msg2.b1, None)
-        self.assertEqual(msg2.b2, None)
+        msg2.b1 = 20
+        msg2.b2 = 30
+
+        self.assertNotEqual(msg2.b1, msg1.b1)
+        self.assertNotEqual(msg2.b2, msg1.b2)
 
 
 class TestLengthField(unittest.TestCase):
@@ -67,11 +70,12 @@ class TestLengthField(unittest.TestCase):
 
     def test_multiplied_length_pack(self):
         msg = self.MyMuiltipliedLengthMessage()
-        payload = ''.join(map(chr, xrange(8 * 4)))
+        payload = ''.join(chr(x) for x in xrange(8 * 4))
         msg.payload = payload
         self.assertEqual(msg.pack(), chr(4) + payload)
 
     def test_bad_modulus_multiplier(self):
+        cls = self.MyMuiltipliedLengthMessage
         msg = self.MyMuiltipliedLengthMessage()
         payload = '\x01'  # 1-byte is not modulo 8
         msg.payload = payload
@@ -109,15 +113,15 @@ class TestByteSequence(unittest.TestCase):
         msg = MyVarSeqMessage()
         msg.type = 0
         msg.seq = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
-        
-        self.assertEqual(msg.pack(), 
+
+        self.assertEqual(msg.pack(),
                          '\x00\n\x01\x02\x03\x04\x05\x06\x07\x08\t\n')
         msg2 = MyVarSeqMessage()
         msg2.unpack(msg.pack())
         self.assertEqual(msg2.length, 10)
         self.assertEqual(msg2.seq, (1, 2, 3, 4, 5, 6, 7, 8, 9, 10))
 
-    
+
 class MyTargetMessage(BaseMessage):
     # inherited from the parent message
     _length = LengthField(DependentField('length'))
