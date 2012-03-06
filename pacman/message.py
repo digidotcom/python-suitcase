@@ -56,7 +56,45 @@ class MessageMeta(type):
 
 
 class BaseMessage(object):
-    """Base clas for all message classes"""
+    r"""Base class for message schema declaration
+
+    ``BaseMessage`` forms the core of the Pacman library and allows for
+    a declarative syntax for specifying packet schemas and associated
+    methods for transforming these schemas into packed bytes (and vice-versa).
+
+    Here's an example showing how one might specify the format for a UDP
+    Datagram::
+
+
+        class UDPDatagram(BaseMessage):
+            source_port = UBInt16()
+            destination_port = UBInt16()
+            length = LengthField(UBInt16())
+            checksum = UBInt16()
+            data = VariableRawPayload(length)
+
+    From this we have a near-ideal form for packing and parsing packet
+    data following the schema::
+
+        >>> dgram = UDPDatagram()
+        >>> dgram.source_port = 9110
+        >>> dgram.destination_port = 1001
+        >>> dgram.checksum = 27193
+        >>> dgram.data = "Hello, world!"
+        >>> dgram.pack()
+        '#\x96\x03\xe9\x00\rj9Hello, world!'
+        >>> dgram2 = UDPDatagram()
+        >>> dgram2.unpack(dgram.pack())
+        >>> print dgram2
+        UDPDatagram (
+          source_port=9110,
+          destination_port=1001,
+          length=13,
+          checksum=27193,
+          data='Hello, world!',
+        )
+
+    """
 
     __metaclass__ = MessageMeta
 
