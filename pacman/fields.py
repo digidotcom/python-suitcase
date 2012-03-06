@@ -87,6 +87,70 @@ class BaseField(object):
         self._value = value
 
 
+class DispatchField(BaseField):
+    """Decorate a field as a dispatch byte (used as conditional)"""
+
+    def __init__(self, field):
+        BaseField.__init__(self)
+        self.field = field
+
+    def __get__(self, obj, objtype=None):
+        return self.field.__get__(self.field)
+
+    def __set__(self, obj, value):
+        return self.field.__set__(self.field, value)
+
+    def __repr__(self):
+        return repr(self.field)
+
+    def _pack(self, stream):
+        return self.field._pack(stream)
+
+    def _unpack(self, stream):
+        return self.field._unpack(stream)
+
+
+class DispatchTarget(BaseField):
+    """Represent a conditional branch on some DispatchField"""
+
+    def __init__(self, length_provider, dispatch_field, dispatch_mapping):
+        BaseField.__init__(self)
+        self.length_provider = length_provider
+        self.dispatch_field = dispatch_field
+        self.dispatch_mapping = dispatch_mapping
+        self.inverse_dispatch_mapping = dict((v.__get__(v), k) for (k, v)
+                                             in dispatch_mapping.iteritems())
+
+        self.length_provider._associate_length_consumer(self)
+
+    def __get__(self, obj, objtype=None):
+        if self._value is not None:
+            target = self._value
+        else:
+            target_key = self.dispatch_field.__get__(self.dispatch_field)
+            target = self.dispatch_mapping.get(target_key, None)
+            if target is None:
+                target = self.dispatch_mapping.get(None, None)
+        return target
+
+    def __set__(self, obj, value):
+        try:
+            vtype = type(value)
+            key = self.inverse_dispatch_mapping[vtype]
+        except KeyError:
+            raise ValueError("The type specified is not in the dispatch table")
+
+        # OK, things check out.  Set both the value here and the
+        # type byte value
+        self._value = value
+        self.dispatch_field.__set__(self.dispatch_field, key)
+
+    def _pack(self, stream):
+        return self._value._packer.write(stream)
+
+    def _unpack(self, stream):
+        return self._value._unpack(stream)
+
 class LengthField(BaseField):
     """Wraps an existing field marking it as a LengthField
 
@@ -122,7 +186,10 @@ class LengthField(BaseField):
 
     def _associate_length_consumer(self, target_field):
         def _length_value_provider():
-            target_field_length = len(target_field.__get__(target_field))
+            from StringIO import StringIO
+            sio = StringIO()
+            target_field._pack(sio)
+            target_field_length = len(sio.getvalue())
             if not target_field_length % self.multiplier == 0:
                 raise ValueError("Payload length not divisible by %s"
                                  % self.multiplier)
@@ -185,6 +252,32 @@ class BaseVariableByteSequence(BaseField):
         self._value = struct.unpack(sfmt, stream.read(length))
 
 
+class SubMessageField(BaseField):
+
+    def __init__(self, sub_message):
+        BaseField.__init__(self)
+        self.sub_message = sub_message
+
+    def __get__(self, obj, objtype=None):
+        return self.sub_message
+
+    def __set__(self, obj, value):
+        self.sub_message = value
+
+    def _pack(self, stream):
+        return self.sub_message._pack(stream)
+
+    def _unpack(self, stream):
+        return self.sub_message._unpack(stream)
+
+
+class DependentField(BaseField):
+    """Field populated by container packet at lower level"""
+
+    def __init__(self):
+        BaseField.__init__(self)
+
+
 class BaseFixedByteSequence(BaseField):
     """Base fixed-length byte sequence field"""
 
@@ -192,9 +285,6 @@ class BaseFixedByteSequence(BaseField):
         BaseField.__init__(self)
         self.size = size
         self.format = make_format(size)
-
-    def __len__(self):
-        return self.size
 
     def _pack(self, stream):
         stream.write(struct.pack(self.format, *self._value))
@@ -235,9 +325,6 @@ class BaseStructField(BaseField):
         BaseField.__init__(self)
         self._value = None
         self._size = struct.calcsize(self.FORMAT)
-
-    def __len__(self):
-        return self._size
 
     def _pack(self, stream):
         stream.write(struct.pack(self.FORMAT, self._value))

@@ -58,9 +58,6 @@ class BaseMessage(object):
 
     __metaclass__ = MessageMeta
 
-    def __len__(self):
-        return sum(len(f) for _n, f in self)
-
     def __iter__(self):
         return iter(self._sorted_fields)
 

@@ -1,5 +1,6 @@
 from pacman.fields import FieldProperty, UBInt8Sequence, UBInt8, \
-    VariableRawPayload, LengthField, UBInt16
+    VariableRawPayload, LengthField, UBInt16, DispatchField, DispatchTarget, \
+    DependentField, SubMessageField
 from pacman.message import BaseMessage
 import unittest
 
@@ -98,6 +99,29 @@ class TestByteSequence(unittest.TestCase):
         msg2.unpack(msg.pack())
         self.assertEqual(msg2.length, 10)
         self.assertEqual(msg2.seq, (1, 2, 3, 4, 5, 6, 7, 8, 9, 10))
+
+    
+class MyTargetMessage(BaseMessage):
+    length = LengthField(DependentField())
+    payload = VariableRawPayload(length)
+
+
+class MyBasicDispatchMessage(BaseMessage):
+    type = DispatchField(UBInt8())
+    length = LengthField(UBInt16())
+    body = DispatchTarget(length, type, {
+        0x00: SubMessageField(MyTargetMessage)
+    })
+
+
+class TestMessageDispatching(unittest.TestCase):
+
+    def test_dispatch_packing(self):
+        msg = MyBasicDispatchMessage()
+        target_msg = MyTargetMessage()
+        target_msg.payload = "Hello, world!"
+        msg.body = target_msg
+        self.assertEqual(msg.pack(), "")
 
 
 if __name__ == "__main__":
