@@ -3,7 +3,7 @@ from setuptools import find_packages
 
 setup(
   name='pacman',
-  version='0.2',
+  version='0.2.1',
   description='A library for specifying/parsing binary protocols',
   long_description=open('README.txt').read(),
   author="Paul Osborne",
