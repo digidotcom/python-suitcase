@@ -1,7 +1,7 @@
 """Example of UDP protocol datagram parsing with pacman"""
-from pacman.fields import (UBInt16, VariableRawPayload, LengthField, Magic,
-    UBInt8Sequence, DispatchField, DispatchTarget, UBInt8, UBInt32, BitField,
-    BitNum, BitBool)
+from pacman.fields import UBInt16, VariableRawPayload, LengthField, Magic, \
+    UBInt8Sequence, DispatchField, DispatchTarget, UBInt8, UBInt32, BitField, BitNum, \
+    BitBool
 from pacman.message import BaseMessage
 import unittest
 

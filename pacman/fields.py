@@ -1,4 +1,3 @@
-import array
 import struct
 
 
@@ -81,10 +80,11 @@ class BaseField(object):
 
 class Magic(BaseField):
     """Represent Byte Magic (fixed, expected sequence of bytes)"""
-    
+
     def __init__(self, expected_sequence):
         BaseField.__init__(self)
         self.expected_sequence = expected_sequence
+        self.bytes_required = len(self.expected_sequence)
 
     def getval(self):
         return self.expected_sequence
@@ -92,12 +92,11 @@ class Magic(BaseField):
     def setval(self):
         raise ValueError("One does not simply modify Magic")
 
-    def _pack(self, stream):
+    def pack(self, stream):
         stream.write(self.expected_sequence)
 
-    def _unpack(self, stream):
-        value = stream.read(len(self.expected_sequence))
-        assert(value == self.expected_sequence)
+    def unpack(self, data):
+        assert(data == self.expected_sequence)
 
 
 class FieldProperty(BaseField):
@@ -142,6 +141,8 @@ class FieldProperty(BaseField):
         self.onget = onget
         self.onset = onset
         self.field = self._ph2f(field)
+        self.bytes_required = 0
+
 
     def _default_onget(self, value):
         return value
@@ -163,10 +164,10 @@ class FieldProperty(BaseField):
 
         self.field.setval(onset(value))
 
-    def _unpack(self, stream):
+    def unpack(self, data):
         pass
 
-    def _pack(self, stream):
+    def pack(self, stream):
         pass
 
 
@@ -194,6 +195,10 @@ class DispatchField(BaseField):
         BaseField.__init__(self, **kwargs)
         self.field = field.create_instance(self._parent)
 
+    @property
+    def bytes_required(self):
+        return self.field.bytes_required
+
     def getval(self):
         return self.field.getval()
 
@@ -203,11 +208,12 @@ class DispatchField(BaseField):
     def __repr__(self):
         return repr(self.field)
 
-    def _pack(self, stream):
-        return self.field._pack(stream)
+    def pack(self, stream):
+        return self.field.pack(stream)
 
-    def _unpack(self, stream):
-        return self.field._unpack(stream)
+    def unpack(self, data):
+        assert len(data) == self.bytes_required
+        return self.field.unpack(data)
 
 
 class DispatchTarget(BaseField):
@@ -251,6 +257,10 @@ class DispatchTarget(BaseField):
 
         return target
 
+    @property
+    def bytes_required(self):
+        return self.length_provider.getval()
+
     def getval(self):
         return self._value
 
@@ -267,14 +277,16 @@ class DispatchTarget(BaseField):
         value._parent = self._parent
         self.dispatch_field.setval(key)
 
-    def _pack(self, stream):
+    def pack(self, stream):
         return self._value._packer.write(stream)
 
-    def _unpack(self, stream):
+    def unpack(self, data):
+        assert len(data) == self.bytes_required
+
         target_msg_type = self._lookup_msg_type()
         message_instance = target_msg_type()
         self.setval(message_instance)
-        self._value._packer.unpack_stream(stream)
+        self._value.unpack(data)
 
 
 class LengthField(BaseField):
@@ -303,6 +315,10 @@ class LengthField(BaseField):
     def __repr__(self):
         return repr(self.length_field)
 
+    @property
+    def bytes_required(self):
+        return self.length_field.bytes_required
+
     def getval(self):
         length_value = self.length_field.getval()
         return length_value
@@ -314,7 +330,7 @@ class LengthField(BaseField):
         def _length_value_provider():
             from StringIO import StringIO
             sio = StringIO()
-            target_field._pack(sio)
+            target_field.pack(sio)
             target_field_length = len(sio.getvalue())
             if not target_field_length % self.multiplier == 0:
                 raise ValueError("Payload length not divisible by %s"
@@ -322,14 +338,15 @@ class LengthField(BaseField):
             return (target_field_length / self.multiplier)
         self.length_value_provider = _length_value_provider
 
-    def _pack(self, stream):
+    def pack(self, stream):
         if self.length_value_provider is None:
             raise Exception("No length_provider added to this LengthField")
         self.length_field._value = self.length_value_provider()
-        self.length_field._pack(stream)
+        self.length_field.pack(stream)
 
-    def _unpack(self, stream):
-        return self.length_field._unpack(stream)
+    def unpack(self, data):
+        assert len(data) == self.bytes_required
+        return self.length_field.unpack(data)
 
     def get_adjusted_length(self):
         return self.getval() * self.multiplier
@@ -352,12 +369,15 @@ class VariableRawPayload(BaseField):
         self.length_provider = self._ph2f(length_provider)
         self.length_provider._associate_length_consumer(self)
 
-    def _pack(self, stream):
+    @property
+    def bytes_required(self):
+        return self.length_provider.get_adjusted_length()
+
+    def pack(self, stream):
         stream.write(self._value)
 
-    def _unpack(self, stream):
-        length = self.length_provider.get_adjusted_length()
-        self._value = stream.read(length)
+    def unpack(self, data):
+        self._value = data
 
 
 class BaseVariableByteSequence(BaseField):
@@ -368,14 +388,20 @@ class BaseVariableByteSequence(BaseField):
         self.length_provider = self._ph2f(length_provider)
         self.length_provider._associate_length_consumer(self)
 
-    def _pack(self, stream):
+    @property
+    def bytes_required(self):
+        return self.length_provider.getval()
+
+    def pack(self, stream):
         sfmt = self.make_format(len(self._value))
         stream.write(struct.pack(sfmt, *self._value))
 
-    def _unpack(self, stream):
-        length = self.length_provider.get_adjusted_length()
+    def unpack(self, data):
+        assert len(data) == self.bytes_required
+
+        length = self.bytes_required
         sfmt = self.make_format(length)
-        self._value = struct.unpack(sfmt, stream.read(length))
+        self._value = struct.unpack(sfmt, data)
 
 
 class DependentField(BaseField):
@@ -408,13 +434,14 @@ class DependentField(BaseField):
 
     def __init__(self, name, **kwargs):
         BaseField.__init__(self, **kwargs)
+        self.bytes_required = 0
         self.parent_field_name = name
         self.parent_field = None
 
-    def _pack(self, stream):
+    def pack(self, stream):
         pass
 
-    def _unpack(self, stream):
+    def unpack(self, data):
         pass
 
     def getval(self):
@@ -432,14 +459,14 @@ class BaseFixedByteSequence(BaseField):
 
     def __init__(self, make_format, size, **kwargs):
         BaseField.__init__(self, **kwargs)
-        self.size = size
+        self.bytes_required = size
         self.format = make_format(size)
 
-    def _pack(self, stream):
+    def pack(self, stream):
         stream.write(struct.pack(self.format, *self._value))
 
-    def _unpack(self, stream):
-        self._value = struct.unpack(self.format, stream.read(self.size))
+    def unpack(self, data):
+        self._value = struct.unpack(self.format, data)
 
 
 def byte_sequence_factory_factory(make_format):
@@ -473,14 +500,13 @@ class BaseStructField(BaseField):
     def __init__(self, **kwargs):
         BaseField.__init__(self, **kwargs)
         self._value = None
-        self._size = struct.calcsize(self.FORMAT)
+        self.bytes_required = struct.calcsize(self.FORMAT)
 
-    def _pack(self, stream):
+    def pack(self, stream):
         stream.write(struct.pack(self.FORMAT, self._value))
 
-    def _unpack(self, stream):
+    def unpack(self, data):
         value = 0
-        data = stream.read(self._size)
         for i, byte in enumerate(reversed(struct.unpack(self.FORMAT, data))):
             value |= (byte << (i * 8))
         self._value = value
@@ -676,6 +702,7 @@ class BitField(BaseField):
 
         self.number_bits = number_bits
         self.number_bytes = number_bits / 8
+        self.bytes_required = self.number_bytes
         placeholders = []
         for key, value in kwargs.iteritems():
             if isinstance(value, _BitFieldFieldPlaceholder):
@@ -703,7 +730,7 @@ class BitField(BaseField):
     def setval(self, value):
         raise Exception()
 
-    def _pack(self, stream):
+    def pack(self, stream):
         value = 0
         shift = self.number_bits
         for _key, field in self._ordered_bitfields:
@@ -714,9 +741,8 @@ class BitField(BaseField):
         out = struct.pack(">Q", value)[-self.number_bytes:]
         stream.write(out)
 
-    def _unpack(self, stream):
-        raw_value = stream.read(self.number_bytes)
-        value = struct.unpack(">Q", raw_value.rjust(8, '\x00'))[0]
+    def unpack(self, data):
+        value = struct.unpack(">Q", data.rjust(8, '\x00'))[0]
         shift = self.number_bits
         for _key, field in self._ordered_bitfields:
             shift -= field.size

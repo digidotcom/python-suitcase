@@ -20,7 +20,7 @@ class Packer(object):
         # now, pack everything in
         for name, field in self.ordered_fields:
             try:
-                field._pack(stream)
+                field.pack(stream)
             except:
                 print "Error packing field '%s' with type %s" % (name, type(field))
                 raise
@@ -30,7 +30,9 @@ class Packer(object):
 
     def unpack_stream(self, stream):
         for _name, field in self.ordered_fields:
-            field._unpack(stream)
+            length = field.bytes_required
+            data = stream.read(length)
+            field.unpack(data)
 
 
 class MessageMeta(type):

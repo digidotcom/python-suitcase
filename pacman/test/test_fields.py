@@ -186,9 +186,8 @@ class TestBitFields(unittest.TestCase):
 
         field2 = field_proto.create_instance(None)
         sio = StringIO()
-        field._pack(sio)
-        sio.seek(0)
-        field2._unpack(sio)
+        field.pack(sio)
+        field2.unpack(sio.getvalue())
         self.assertEqual(field2.nib1, 1)
         self.assertEqual(field2.nib2, 2)
         self.assertEqual(field2.nib3, 3)
