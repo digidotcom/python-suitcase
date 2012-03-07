@@ -1,9 +1,10 @@
 """Example of UDP protocol datagram parsing with pacman"""
-from pacman.fields import UBInt16, VariableRawPayload, LengthField, Magic, \
-    UBInt8Sequence, DispatchField, DispatchTarget, UBInt8, UBInt32, BitField, BitNum, \
-    BitBool
+from pacman.fields import (UBInt16, VariableRawPayload, LengthField, Magic,
+    UBInt8Sequence, DispatchField, DispatchTarget, UBInt8, UBInt32, BitField,
+    BitNum, BitBool)
 from pacman.message import BaseMessage
 import unittest
+
 
 class TCPFrameHeader(BaseMessage):
     source_address = UBInt16()
@@ -63,7 +64,7 @@ class IPV4Frame(BaseMessage):
 # For instance, we don't allow for the option 802.1q vlan tagging
 # which could come after mac_source
 class EthernetFrame(BaseMessage):
-    preamble_sof = Magic('\xAA' * 8) # 8 bytes of 10101010
+    preamble_sof = Magic('\xAA' * 8)  # 8 bytes of 10101010
     mac_dest = UBInt8Sequence(6)
     mac_source = UBInt8Sequence(6)
     ethertype = DispatchField(UBInt16())
@@ -77,7 +78,7 @@ class EthernetFrame(BaseMessage):
 
 
 class TestIPV4Frame(unittest.TestCase):
-    
+
     def test(self):
         ipv4 = IPV4Frame()
         ipv4.options.version = 0x01
@@ -96,11 +97,12 @@ class TestIPV4Frame(unittest.TestCase):
         ipv4.time_to_live = 0x10
         ipv4.header_checksum = 0x90
 
-        packed_value = '\x10\x06\x00\x90\x91\x91\x91\x91\x88wfU'
+        packed_value = '\x10\x15\x00\x03\xfe\xfe \x9f\x10\x06\x00\x90\x91\x91\x91\x91\x88wfU'
         ipv4_2 = IPV4Frame()
         ipv4_2.unpack(packed_value)
         self.assertEqual(ipv4_2.options.version, 0x01)
         self.assertEqual(ipv4_2.options.internet_header_length, 0x00)
+
 
 class TestUDPDatagram(unittest.TestCase):
 

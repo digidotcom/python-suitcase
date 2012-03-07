@@ -620,6 +620,7 @@ class _BitFieldField(object):
         else:
             return _BitFieldFieldPlaceholder(cls, args, kwargs)
 
+
 class _BitBool(_BitFieldField):
 
     def __init__(self, **kwargs):
@@ -653,7 +654,7 @@ class _BitNum(_BitFieldField):
     def getval(self):
         return self._value
     viewget = getval
-    
+
     def setval(self, value):
         self._value = value
     viewset = setval
@@ -664,7 +665,7 @@ BitBool = bitfield_placeholder_factory_factory(_BitBool)
 
 
 class BitField(BaseField):
-    
+
     def __init__(self, number_bits, **kwargs):
         BaseField.__init__(self, **kwargs)
         self._ordered_bitfields = []
@@ -674,7 +675,7 @@ class BitField(BaseField):
                 "Number of bits must be a factor of 8, was %d" % number_bits)
 
         self.number_bits = number_bits
-        self.number_bytes = number_bits % 8
+        self.number_bytes = number_bits / 8
         placeholders = []
         for key, value in kwargs.iteritems():
             if isinstance(value, _BitFieldFieldPlaceholder):
@@ -688,7 +689,7 @@ class BitField(BaseField):
     def __getattr__(self, key):
         if key in self.__dict__.get('_bitfield_map', {}):
             return self._bitfield_map[key].viewget()
-        raise AttributeError()
+        return object.__getattribute__(self, key)
 
     def __setattr__(self, key, value):
         if key in self.__dict__.get('_bitfield_map', {}):
@@ -706,18 +707,19 @@ class BitField(BaseField):
         value = 0
         shift = self.number_bits
         for _key, field in self._ordered_bitfields:
-            mask = (1 << (field.size - 1))
-            value |= ((field.getval() & mask) << shift)
             shift -= field.size
+            mask = (2 ** field.size - 1)  # mask off size bits
+            value |= ((field.getval() & mask) << shift)
 
-        a = array.array("B", [(value >> (8 * i)) & 0xFF
-                              for i in xrange(self.number_bytes)])
-        stream.write(a.tostring())
+        out = struct.pack(">Q", value)[-self.number_bytes:]
+        stream.write(out)
 
     def _unpack(self, stream):
-        value = stream.read(self.number_bytes)
+        raw_value = stream.read(self.number_bytes)
+        value = struct.unpack(">Q", raw_value.rjust(8, '\x00'))[0]
         shift = self.number_bits
         for _key, field in self._ordered_bitfields:
-            mask = (1 << (field.size - 1))
-            field.setval((value & mask) >> (shift - field.size + 1))
             shift -= field.size
+            mask = (2 ** field.size - 1)
+            fval = (value >> shift) & mask
+            field.setval(fval)
