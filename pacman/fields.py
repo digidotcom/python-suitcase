@@ -1,3 +1,4 @@
+import array
 import struct
 
 
@@ -76,6 +77,27 @@ class BaseField(object):
 
     def setval(self, value):
         self._value = value
+
+
+class Magic(BaseField):
+    """Represent Byte Magic (fixed, expected sequence of bytes)"""
+    
+    def __init__(self, expected_sequence):
+        BaseField.__init__(self)
+        self.expected_sequence = expected_sequence
+
+    def getval(self):
+        return self.expected_sequence
+
+    def setval(self):
+        raise ValueError("One does not simply modify Magic")
+
+    def _pack(self, stream):
+        stream.write(self.expected_sequence)
+
+    def _unpack(self, stream):
+        value = stream.read(len(self.expected_sequence))
+        assert(value == self.expected_sequence)
 
 
 class FieldProperty(BaseField):
@@ -559,3 +581,143 @@ class SLInt32(BaseStructField):
 class SLInt64(BaseStructField):
     """Signed Little Endian 64-bit integer field"""
     FORMAT = "<q"
+
+
+#==============================================================================
+# BitField and Bits
+#==============================================================================
+def bitfield_placeholder_factory_factory(cls):
+    def _factory_fn(*args, **kwargs):
+        return cls(*args, **kwargs)
+    return _factory_fn
+
+
+class _BitFieldFieldPlaceholder(object):
+
+    _global_seqno = 0
+
+    def __init__(self, cls, args, kwargs):
+        self.cls = cls
+        self.args = args
+        self.kwargs = kwargs
+        self.sequence_number = _BitFieldFieldPlaceholder._global_seqno
+        _BitFieldFieldPlaceholder._global_seqno += 1
+
+    def create_instance(self):
+        kwargs = self.kwargs
+        kwargs['instantiate'] = True
+        return self.cls(*self.args, **self.kwargs)
+
+
+class _BitFieldField(object):
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def __new__(cls, *args, **kwargs):
+        if 'instantiate' in kwargs:
+            return object.__new__(cls, *args, **kwargs)
+        else:
+            return _BitFieldFieldPlaceholder(cls, args, kwargs)
+
+class _BitBool(_BitFieldField):
+
+    def __init__(self, **kwargs):
+        _BitFieldField.__init__(self, **kwargs)
+        self.size = 1
+        self._value = 0
+
+    def getval(self):
+        return self._value
+
+    def setval(self, value):
+        self._value = value
+
+    def viewget(self):
+        return (self._value == 1)
+
+    def viewset(self, value):
+        if value:
+            self._value = 1
+        else:
+            self._value = 0
+
+
+class _BitNum(_BitFieldField):
+
+    def __init__(self, size, **kwargs):
+        _BitFieldField.__init__(self, **kwargs)
+        self.size = size
+        self._value = 0
+
+    def getval(self):
+        return self._value
+    viewget = getval
+    
+    def setval(self, value):
+        self._value = value
+    viewset = setval
+
+
+BitNum = bitfield_placeholder_factory_factory(_BitNum)
+BitBool = bitfield_placeholder_factory_factory(_BitBool)
+
+
+class BitField(BaseField):
+    
+    def __init__(self, number_bits, **kwargs):
+        BaseField.__init__(self, **kwargs)
+        self._ordered_bitfields = []
+        self._bitfield_map = {}
+        if number_bits % 8 != 0:
+            raise ValueError(
+                "Number of bits must be a factor of 8, was %d" % number_bits)
+
+        self.number_bits = number_bits
+        self.number_bytes = number_bits % 8
+        placeholders = []
+        for key, value in kwargs.iteritems():
+            if isinstance(value, _BitFieldFieldPlaceholder):
+                placeholders.append((key, value))
+
+        for key, placeholder in sorted(placeholders, key=lambda (k, v): v.sequence_number):
+            value = placeholder.create_instance()
+            self._bitfield_map[key] = value
+            self._ordered_bitfields.append((key, value))
+
+    def __getattr__(self, key):
+        if key in self.__dict__.get('_bitfield_map', {}):
+            return self._bitfield_map[key].viewget()
+        raise AttributeError()
+
+    def __setattr__(self, key, value):
+        if key in self.__dict__.get('_bitfield_map', {}):
+            self._bitfield_map[key].viewset(value)
+        else:
+            self.__dict__[key] = value
+
+    def getval(self):
+        return self
+
+    def setval(self, value):
+        raise Exception()
+
+    def _pack(self, stream):
+        value = 0
+        shift = self.number_bits
+        for _key, field in self._ordered_bitfields:
+            mask = (1 << (field.size - 1))
+            value |= ((field.getval() & mask) << shift)
+            shift -= field.size
+
+        a = array.array("B", [(value >> (8 * i)) & 0xFF
+                              for i in xrange(self.number_bytes)])
+        stream.write(a.tostring())
+
+    def _unpack(self, stream):
+        value = stream.read(self.number_bytes)
+        shift = self.number_bits
+        for _key, field in self._ordered_bitfields:
+            mask = (1 << (field.size - 1))
+            field.setval((value & mask) >> (shift - field.size + 1))
+            shift -= field.size

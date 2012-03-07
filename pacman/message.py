@@ -18,8 +18,12 @@ class Packer(object):
 
     def write(self, stream):
         # now, pack everything in
-        for _name, field in self.ordered_fields:
-            field._pack(stream)
+        for name, field in self.ordered_fields:
+            try:
+                field._pack(stream)
+            except:
+                print "Error packing field '%s' with type %s" % (name, type(field))
+                raise
 
     def unpack(self, data):
         self.unpack_stream(StringIO(data))

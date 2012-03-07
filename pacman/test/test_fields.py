@@ -1,6 +1,7 @@
+from StringIO import StringIO
 from pacman.fields import FieldProperty, UBInt8Sequence, UBInt8, \
     VariableRawPayload, LengthField, UBInt16, DispatchField, DispatchTarget, \
-    DependentField
+    DependentField, BitField, BitNum
 from pacman.message import BaseMessage
 import unittest
 
@@ -165,6 +166,30 @@ class TestMessageDispatching(unittest.TestCase):
         self.assertEqual(msg.type, 0x00)
         body = msg.body
         self.assertEqual(body.payload, "Hello, world!")
+
+
+class TestBitFields(unittest.TestCase):
+
+    def test_packing(self):
+        field_proto = BitField(16,
+            nib1=BitNum(4),
+            nib2=BitNum(4),
+            nib3=BitNum(4),
+            nib4=BitNum(4),
+        )
+        field = field_proto.create_instance(None)
+
+        field.nib1 = 1
+        field.nib2 = 2
+        field.nib3 = 3
+        field.nib4 = 4
+
+        field2 = field_proto.create_instance(None)
+        field2._unpack(StringIO(field.pack()))
+        self.assertEqual(field2.nib1, 1)
+        self.assertEqual(field2.nib2, 2)
+        self.assertEqual(field2.nib3, 3)
+        self.assertEqual(field2.nib4, 4)
 
 
 if __name__ == "__main__":
