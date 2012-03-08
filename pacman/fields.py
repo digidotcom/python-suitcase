@@ -81,8 +81,8 @@ class BaseField(object):
 class Magic(BaseField):
     """Represent Byte Magic (fixed, expected sequence of bytes)"""
 
-    def __init__(self, expected_sequence):
-        BaseField.__init__(self)
+    def __init__(self, expected_sequence, **kwargs):
+        BaseField.__init__(self, **kwargs)
         self.expected_sequence = expected_sequence
         self.bytes_required = len(self.expected_sequence)
 

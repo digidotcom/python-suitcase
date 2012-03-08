@@ -1,11 +1,13 @@
 from StringIO import StringIO
-from pacman.fields import BitField, BitBool, BitNum, UBInt8, UBInt16, \
-    UBInt32, UBInt64, SBInt8, SBInt16, SBInt32, SBInt64, ULInt8, ULInt16, ULInt32, \
-    ULInt64, SLInt8, SLInt16, SLInt32, SLInt64, LengthField, UBInt8Sequence, \
-    SBInt8Sequence, DispatchField, FieldProperty, VariableRawPayload, DependentField, \
-    DispatchTarget
+from pacman.fields import BitField, BitBool, BitNum, UBInt8, UBInt16, UBInt32, \
+    UBInt64, SBInt8, SBInt16, SBInt32, SBInt64, ULInt8, ULInt16, ULInt32, ULInt64, \
+    SLInt8, SLInt16, SLInt32, SLInt64, LengthField, UBInt8Sequence, SBInt8Sequence, \
+    DispatchField, FieldProperty, VariableRawPayload, DependentField, DispatchTarget, \
+    Magic
 from pacman.message import BaseMessage
+import struct
 import unittest
+from pacman.test.examples.test_network_stack import UDPFrame
 
 
 class SuperChild(BaseMessage):
@@ -18,6 +20,8 @@ class SuperChild(BaseMessage):
 
 # Message containing every field
 class SuperMessage(BaseMessage):
+    magic = Magic('\xAA\xAA')
+
     # bitfield
     options = BitField(8,
         b1=BitBool(),
@@ -60,11 +64,24 @@ class SuperMessage(BaseMessage):
     ubseqf = UBInt8Sequence(5)
     sbseqf = SBInt8Sequence(5)
 
+    # don't change anything... for test coverage
+    ulint16_value = FieldProperty(ulint16)
+    ulint16_byte_string = FieldProperty(ulint16,
+        onget=lambda v: str(v),
+        onset=lambda v: struct.unpack(">H", v)[0])
+
     message_type = DispatchField(UBInt8())
     submessage_length = LengthField(UBInt16())
     submessage = DispatchTarget(submessage_length, message_type, {
         0xEF: SuperChild
     })
+
+
+class TestMagic(unittest.TestCase):
+
+    def test_magic(self):
+        magic_field = Magic('\xAA').create_instance(None)
+        self.assertRaises(ValueError, magic_field.setval)
 
 
 class TestSuperField(unittest.TestCase):
@@ -89,6 +106,9 @@ class TestSuperField(unittest.TestCase):
 
         s.ulint8 = 0xAA
         s.ulint16 = 0xAABB
+        s.ulint16_byte_string = '\xAA\xBB'
+        s.ulint16_value = 0xBBAA
+
         s.ulint32 = 0xAABBCCDD
         s.ulint64 = 0xAABBCCDDEEFF0011
 
@@ -127,6 +147,11 @@ class TestSuperField(unittest.TestCase):
             else:
                 sm1_value = getattr(sm, key)
                 self.assertEqual(sm2_value, sm1_value, "%s: %s != %s, types(%s, %s)" % (key, sm2_value, sm1_value, type(sm2_value), type(sm1_value)))
+
+    def test_repr_works(self):
+        # just make sure nothing creashes
+        sm = self._create_supermessage()
+        repr(sm)
 
 
 class TestFieldProperty(unittest.TestCase):
@@ -258,12 +283,18 @@ class MyOtherTargetMessage(BaseMessage):
     sequence = UBInt8Sequence(_length)
 
 
+class MyDefaultTargetMessage(BaseMessage):
+    _length = LengthField(DependentField('length'))
+    sequence = UBInt8Sequence(_length)
+
+
 class MyBasicDispatchMessage(BaseMessage):
     type = DispatchField(UBInt8())
     length = LengthField(UBInt16())
     body = DispatchTarget(length, type, {
         0x00: MyTargetMessage,
-        0x01: MyOtherTargetMessage
+        0x01: MyOtherTargetMessage,
+        None: MyDefaultTargetMessage
     })
 
 
@@ -290,6 +321,15 @@ class TestMessageDispatching(unittest.TestCase):
         body = msg.body
         self.assertEqual(body.payload, "Hello, world!")
 
+    def test_foreign_type(self):
+        msg = MyBasicDispatchMessage()
+        self.assertRaises(ValueError, setattr, msg, 'body', SuperMessage())
+
+    def test_default_dispatch(self):
+        msg = MyBasicDispatchMessage()
+        msg.unpack("\x10\x00\rHello, world!")
+        self.assert_(isinstance(msg.body, MyDefaultTargetMessage))
+
 
 class TestBitFields(unittest.TestCase):
 
@@ -315,6 +355,11 @@ class TestBitFields(unittest.TestCase):
         self.assertEqual(field2.nib2, 2)
         self.assertEqual(field2.nib3, 3)
         self.assertEqual(field2.nib4, 4)
+
+    def test_bad_operations(self):
+        field_proto = BitField(7,
+            num=BitNum(7))
+        self.assertRaises(ValueError, field_proto.create_instance, None)
 
 
 if __name__ == "__main__":
