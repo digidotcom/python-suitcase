@@ -438,6 +438,17 @@ class DependentField(BaseField):
         self.parent_field_name = name
         self.parent_field = None
 
+    def _get_parent_field(self):
+        if self.parent_field is None:
+            message_parent = self._parent._parent
+            target_field = message_parent.lookup_field_by_name(
+                                self.parent_field_name)
+            self.parent_field = target_field
+        return self.parent_field
+
+    def __getattr__(self, attr):
+        return getattr(self._get_parent_field(), attr)
+
     def pack(self, stream):
         pass
 
@@ -445,13 +456,10 @@ class DependentField(BaseField):
         pass
 
     def getval(self):
-        message_parent = self._parent._parent
-        target_field = message_parent.lookup_field_by_name(
-                            self.parent_field_name)
-        return target_field.getval()
+        return self._get_parent_field().getval()
 
     def setval(self, value):
-        return self.parent_field.setval(value)
+        return self._get_parent_field().setval(value)
 
 
 class BaseFixedByteSequence(BaseField):
