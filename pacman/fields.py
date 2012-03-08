@@ -533,11 +533,6 @@ class UBInt16(BaseStructField):
     FORMAT = ">H"
 
 
-class UBInt24(BaseStructField):
-    """Unsigned Big Endian 24-bit integer field"""
-    FORMAT = ">BBB"
-
-
 class UBInt32(BaseStructField):
     """Unsigned Big Endian 32-bit integer field"""
     FORMAT = ">I"

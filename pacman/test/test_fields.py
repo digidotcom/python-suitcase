@@ -1,9 +1,132 @@
 from StringIO import StringIO
-from pacman.fields import FieldProperty, UBInt8Sequence, UBInt8, \
-    VariableRawPayload, LengthField, UBInt16, DispatchField, DispatchTarget, \
-    DependentField, BitField, BitNum
+from pacman.fields import BitField, BitBool, BitNum, UBInt8, UBInt16, \
+    UBInt32, UBInt64, SBInt8, SBInt16, SBInt32, SBInt64, ULInt8, ULInt16, ULInt32, \
+    ULInt64, SLInt8, SLInt16, SLInt32, SLInt64, LengthField, UBInt8Sequence, \
+    SBInt8Sequence, DispatchField, FieldProperty, VariableRawPayload, DependentField, \
+    DispatchTarget
 from pacman.message import BaseMessage
 import unittest
+
+
+class SuperChild(BaseMessage):
+    options = DependentField('options')
+    ubseq = DependentField('ubseq')
+    length = LengthField(DependentField('submessage_length'))
+
+    remaining = VariableRawPayload(length)
+
+
+# Message containing every field
+class SuperMessage(BaseMessage):
+    # bitfield
+    options = BitField(8,
+        b1=BitBool(),
+        b2=BitBool(),
+        rest=BitNum(6))
+
+    # unsigned big endian
+    ubint8 = UBInt8()
+    ubint16 = UBInt16()
+#    ubint24 = UBInt24()
+    ubint32 = UBInt32()
+    ubint64 = UBInt64()
+
+    # signed big endian
+    sbint8 = SBInt8()
+    sbint16 = SBInt16()
+    sbint32 = SBInt32()
+    sbint64 = SBInt64()
+
+    # unsigned little endian
+    ulint8 = ULInt8()
+    ulint16 = ULInt16()
+    ulint32 = ULInt32()
+    ulint64 = ULInt64()
+
+    # signed little endian
+    slint8 = SLInt8()
+    slint16 = SLInt16()
+    slint32 = SLInt32()
+    slint64 = SLInt64()
+
+    # sequences with variable lengths
+    ubseql = LengthField(UBInt8())
+    ubseq = UBInt8Sequence(ubseql)
+
+    sbseql = LengthField(UBInt8())
+    sbseq = SBInt8Sequence(sbseql)
+
+    # sequences with fixed lengths
+    ubseqf = UBInt8Sequence(5)
+    sbseqf = SBInt8Sequence(5)
+
+    message_type = DispatchField(UBInt8())
+    submessage_length = LengthField(UBInt16())
+    submessage = DispatchTarget(submessage_length, message_type, {
+        0xEF: SuperChild
+    })
+
+
+class TestSuperField(unittest.TestCase):
+
+    def _create_supermessage(self):
+        s = SuperMessage()
+
+        s.options.b1 = False
+        s.options.b2 = True
+        s.options.remaining = 0x1A
+
+        # packed fields
+        s.ubint8 = 0xAA
+        s.ubint16 = 0xAABB
+        s.ubint32 = 0xAABBCCDD
+        s.ubint64 = 0xAABBCCDDEEFF0011
+
+        s.sbint8 = -25
+        s.sbint16 = -312
+        s.sbint32 = -9570
+        s.sbint64 = -29349579
+
+        s.ulint8 = 0xAA
+        s.ulint16 = 0xAABB
+        s.ulint32 = 0xAABBCCDD
+        s.ulint64 = 0xAABBCCDDEEFF0011
+
+        s.slint8 = -25
+        s.slint16 = -312
+        s.slint32 = -9570
+        s.slint64 = -29349579
+
+        s.ubseq = tuple(range(10))
+        s.sbseq = tuple([x - 5 for x in range(10)])
+        s.ubseqf = tuple(range(5))
+        s.sbseqf = tuple([x - 2 for x in range(5)])
+
+        sub = SuperChild()
+        sub.remaining = "Hello, this is SuperChild!"
+        s.submessage = sub
+
+        return s
+
+    def test_super_message(self):
+        sm = self._create_supermessage()
+        packed = sm.pack()
+        sm2 = SuperMessage()
+        sm2.unpack(packed)
+
+        for key, field in sm2:
+            sm2_value = field.getval()
+            if key == 'options':
+                self.assertEqual(sm2_value.b1, sm.options.b1)
+                self.assertEqual(sm2_value.b2, sm.options.b2)
+                self.assertEqual(sm2_value.rest, sm.options.rest)
+
+            elif key == 'submessage':
+                self.assertEqual(sm2_value.ubseq, sm.ubseq)
+                self.assertEqual(sm2_value.remaining, sm.submessage.remaining)
+            else:
+                sm1_value = getattr(sm, key)
+                self.assertEqual(sm2_value, sm1_value, "%s: %s != %s, types(%s, %s)" % (key, sm2_value, sm1_value, type(sm2_value), type(sm1_value)))
 
 
 class TestFieldProperty(unittest.TestCase):

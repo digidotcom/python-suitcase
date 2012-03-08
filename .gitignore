@@ -18,4 +18,5 @@ MANIFEST
 # Buildout
 bin
 .buildout
+cover
 
