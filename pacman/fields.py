@@ -284,6 +284,10 @@ class DispatchTarget(BaseField):
         assert len(data) == self.bytes_required
 
         target_msg_type = self._lookup_msg_type()
+        if target_msg_type is None:
+            target_msg_type = self.dispatch_mapping.get(None)
+        if target_msg_type is None:  # still none
+            raise ValueError("Input data contains type byte not contained in mapping")
         message_instance = target_msg_type()
         self.setval(message_instance)
         self._value.unpack(data)
