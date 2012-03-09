@@ -377,5 +377,11 @@ class TestBitFields(unittest.TestCase):
         # should be packed in little endian form
         self.assertEqual(sio.getvalue(), "\xef\x81")
 
+        inst2 = field_proto.create_instance(None)
+        inst2.unpack("\xef\x81")
+        self.assertEqual(inst.b1, inst2.b1)
+        self.assertEqual(inst.b2, inst2.b2)
+        self.assertEqual(inst.remaining, inst2.remaining)
+
 if __name__ == "__main__":
     unittest.main()

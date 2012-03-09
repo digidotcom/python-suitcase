@@ -782,7 +782,8 @@ class BitField(BaseField):
         stream.write(out)
 
     def unpack(self, data):
-        value = struct.unpack(">Q", data.rjust(8, '\x00'))[0]
+        self._field.unpack(data)
+        value = self._field.getval()
         shift = self.number_bits
         for _key, field in self._ordered_bitfields:
             shift -= field.size
