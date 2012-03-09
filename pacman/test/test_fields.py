@@ -3,11 +3,11 @@ from pacman.fields import BitField, BitBool, BitNum, UBInt8, UBInt16, UBInt32, \
     UBInt64, SBInt8, SBInt16, SBInt32, SBInt64, ULInt8, ULInt16, ULInt32, ULInt64, \
     SLInt8, SLInt16, SLInt32, SLInt64, LengthField, UBInt8Sequence, SBInt8Sequence, \
     DispatchField, FieldProperty, VariableRawPayload, DependentField, DispatchTarget, \
-    Magic
+    Magic, UBInt24
 from pacman.message import BaseMessage
+from pacman.test.examples.test_network_stack import UDPFrame
 import struct
 import unittest
-from pacman.test.examples.test_network_stack import UDPFrame
 
 
 class SuperChild(BaseMessage):
@@ -31,7 +31,7 @@ class SuperMessage(BaseMessage):
     # unsigned big endian
     ubint8 = UBInt8()
     ubint16 = UBInt16()
-#    ubint24 = UBInt24()
+    ubint24 = UBInt24()
     ubint32 = UBInt32()
     ubint64 = UBInt64()
 
@@ -96,6 +96,7 @@ class TestSuperField(unittest.TestCase):
         # packed fields
         s.ubint8 = 0xAA
         s.ubint16 = 0xAABB
+        s.ubint24 = 0xAABBCC
         s.ubint32 = 0xAABBCCDD
         s.ubint64 = 0xAABBCCDDEEFF0011
 
@@ -361,6 +362,20 @@ class TestBitFields(unittest.TestCase):
             num=BitNum(7))
         self.assertRaises(ValueError, field_proto.create_instance, None)
 
+    def test_explicit_field_override(self):
+        field_proto = BitField(16, ULInt16(),
+            b1=BitBool(),
+            b2=BitBool(),
+            remaining=BitNum(14))
+        inst = field_proto.create_instance(None)
+        inst.b1 = True
+        inst.b2 = False
+        inst.remaining = 0x1EF
+        sio = StringIO()
+        inst.pack(sio)
+
+        # should be packed in little endian form
+        self.assertEqual(sio.getvalue(), "\xef\x81")
 
 if __name__ == "__main__":
     unittest.main()

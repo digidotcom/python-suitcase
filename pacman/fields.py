@@ -1,3 +1,7 @@
+try:
+    from cStringIO import StringIO
+except ImportError:
+    import StringIO
 import struct
 
 
@@ -512,14 +516,23 @@ class BaseStructField(BaseField):
     def __init__(self, **kwargs):
         BaseField.__init__(self, **kwargs)
         self._value = None
-        self.bytes_required = struct.calcsize(self.FORMAT)
+        self._keep_bytes = getattr(self, "KEEP_BYTES", None)
+        if self._keep_bytes is not None:
+            self.bytes_required = self._keep_bytes
+        else:
+            self.bytes_required = struct.calcsize(self.PACK_FORMAT)
 
     def pack(self, stream):
-        stream.write(struct.pack(self.FORMAT, self._value))
+        keep_bytes = getattr(self, 'KEEP_BYTES', None)
+        if keep_bytes is not None:
+            to_write = struct.pack(self.PACK_FORMAT, self._value)[-keep_bytes:]
+        else:
+            to_write = struct.pack(self.PACK_FORMAT, self._value)
+        stream.write(to_write)
 
     def unpack(self, data):
         value = 0
-        for i, byte in enumerate(reversed(struct.unpack(self.FORMAT, data))):
+        for i, byte in enumerate(reversed(struct.unpack(self.UNPACK_FORMAT, data))):
             value |= (byte << (i * 8))
         self._value = value
 
@@ -529,22 +542,29 @@ class BaseStructField(BaseField):
 #==============================================================================
 class UBInt8(BaseStructField):
     """Unsigned Big Endian 8-bit integer field"""
-    FORMAT = ">B"
+    PACK_FORMAT = UNPACK_FORMAT = ">B"
 
 
 class UBInt16(BaseStructField):
     """Unsigned Big Endian 16-bit integer field"""
-    FORMAT = ">H"
+    PACK_FORMAT = UNPACK_FORMAT = ">H"
+
+
+class UBInt24(BaseStructField):
+    """Unsigned Big Endian 24-bit integer field"""
+    KEEP_BYTES = 3
+    PACK_FORMAT = ">I"
+    UNPACK_FORMAT = ">BBB"
 
 
 class UBInt32(BaseStructField):
     """Unsigned Big Endian 32-bit integer field"""
-    FORMAT = ">I"
+    PACK_FORMAT = UNPACK_FORMAT = ">I"
 
 
 class UBInt64(BaseStructField):
     """Unsigned Big Endian 64-bit integer field"""
-    FORMAT = ">Q"
+    PACK_FORMAT = UNPACK_FORMAT = ">Q"
 
 
 #==============================================================================
@@ -552,22 +572,22 @@ class UBInt64(BaseStructField):
 #==============================================================================
 class SBInt8(BaseStructField):
     """Signed Big Endian 8-bit integer field"""
-    FORMAT = ">b"
+    PACK_FORMAT = UNPACK_FORMAT = ">b"
 
 
 class SBInt16(BaseStructField):
     """Signed Big Endian 16-bit integer field"""
-    FORMAT = ">h"
+    PACK_FORMAT = UNPACK_FORMAT = ">h"
 
 
 class SBInt32(BaseStructField):
     """Signed Big Endian 32-bit integer field"""
-    FORMAT = ">i"
+    PACK_FORMAT = UNPACK_FORMAT = ">i"
 
 
 class SBInt64(BaseStructField):
     """Signed Big Endian 64-bit integer field"""
-    FORMAT = ">q"
+    PACK_FORMAT = UNPACK_FORMAT = ">q"
 
 
 #==============================================================================
@@ -575,22 +595,22 @@ class SBInt64(BaseStructField):
 #==============================================================================
 class ULInt8(BaseStructField):
     """Unsigned Little Endian 8-bit integer field"""
-    FORMAT = "<B"
+    PACK_FORMAT = UNPACK_FORMAT = "<B"
 
 
 class ULInt16(BaseStructField):
     """Unsigned Little Endian 16-bit integer field"""
-    FORMAT = "<H"
+    PACK_FORMAT = UNPACK_FORMAT = "<H"
 
 
 class ULInt32(BaseStructField):
     """Unsigned Little Endian 32-bit integer field"""
-    FORMAT = "<I"
+    PACK_FORMAT = UNPACK_FORMAT = "<I"
 
 
 class ULInt64(BaseStructField):
     """Unsigned Little Endian 64-bit integer field"""
-    FORMAT = "<Q"
+    PACK_FORMAT = UNPACK_FORMAT = "<Q"
 
 
 #==============================================================================
@@ -598,22 +618,22 @@ class ULInt64(BaseStructField):
 #==============================================================================
 class SLInt8(BaseStructField):
     """Signed Little Endian 8-bit integer field"""
-    FORMAT = "<b"
+    PACK_FORMAT = UNPACK_FORMAT = "<b"
 
 
 class SLInt16(BaseStructField):
     """Signed Little Endian 16-bit integer field"""
-    FORMAT = "<h"
+    PACK_FORMAT = UNPACK_FORMAT = "<h"
 
 
 class SLInt32(BaseStructField):
     """Signed Little Endian 32-bit integer field"""
-    FORMAT = "<i"
+    PACK_FORMAT = UNPACK_FORMAT = "<i"
 
 
 class SLInt64(BaseStructField):
     """Signed Little Endian 64-bit integer field"""
-    FORMAT = "<q"
+    PACK_FORMAT = UNPACK_FORMAT = "<q"
 
 
 #==============================================================================
@@ -699,7 +719,7 @@ BitBool = bitfield_placeholder_factory_factory(_BitBool)
 
 class BitField(BaseField):
 
-    def __init__(self, number_bits, **kwargs):
+    def __init__(self, number_bits, field=None, **kwargs):
         BaseField.__init__(self, **kwargs)
         self._ordered_bitfields = []
         self._bitfield_map = {}
@@ -710,6 +730,16 @@ class BitField(BaseField):
         self.number_bits = number_bits
         self.number_bytes = number_bits / 8
         self.bytes_required = self.number_bytes
+        if field is None:
+            field = {
+                1: UBInt8,
+                2: UBInt16,
+                3: UBInt24,
+                4: UBInt32,
+                8: UBInt64,
+            }[self.number_bytes]()
+        self._field = field.create_instance(self._parent)
+
         placeholders = []
         for key, value in kwargs.iteritems():
             if isinstance(value, _BitFieldFieldPlaceholder):
@@ -745,7 +775,10 @@ class BitField(BaseField):
             mask = (2 ** field.size - 1)  # mask off size bits
             value |= ((field.getval() & mask) << shift)
 
-        out = struct.pack(">Q", value)[-self.number_bytes:]
+        self._field.setval(value)
+        sio = StringIO()
+        self._field.pack(sio)
+        out = sio.getvalue()[-self.number_bytes:]
         stream.write(out)
 
     def unpack(self, data):
