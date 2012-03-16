@@ -720,6 +720,47 @@ BitBool = bitfield_placeholder_factory_factory(_BitBool)
 
 
 class BitField(BaseField):
+    """Represent a sequence of bytes broken down into bit segments
+
+    Bit segments may be any BitFieldField instance, with the two most
+    commonly used fields being:
+     * BitBool(): A single bit flag that is either True or False
+     * BitNum(bits): A multi-bit field treated like a big-endian integral
+           value.
+
+    Example Usage::
+
+        class TCPFrameHeader(BaseMessage):
+            source_address = UBInt16()
+            destination_address = UBInt16()
+            sequence_number = UBInt32()
+            acknowledgement_number = UBInt32()
+            options = BitField(16,
+                data_offset=BitNum(4),
+                reserved=BitNum(3),
+                NS=BitBool(),
+                CWR=BitBool(),
+                ECE=BitBool(),
+                URG=BitBool(),
+                ACK=BitBool(),
+                PSH=BitBool(),
+                RST=BitBool(),
+                SYN=BitBool(),
+                FIN=BitBool()
+            )
+            window_size = UBInt16()
+            checksum = UBInt16()
+            urgent_pointer = UBInt16()
+
+        tcp_packet = TCPFrameHeader()
+        o = tcp_packet.options
+        o.data_offset = 3
+        o.NS = True
+        o.CWR = False
+        o.
+        # ... so on, so forth
+
+    """
 
     def __init__(self, number_bits, field=None, **kwargs):
         BaseField.__init__(self, **kwargs)
