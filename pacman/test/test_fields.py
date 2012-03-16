@@ -271,6 +271,17 @@ class TestByteSequence(unittest.TestCase):
         self.assertEqual(msg2.length, 10)
         self.assertEqual(msg2.seq, (1, 2, 3, 4, 5, 6, 7, 8, 9, 10))
 
+    def test_variable_sequence_nolength(self):
+        class MyVarSeqMessage(BaseMessage):
+            s = VariableRawPayload(None)
+            b = UBInt8Sequence(None)
+
+        m = MyVarSeqMessage()
+        m.s = "Hello, world - "
+        m.b = [0, 1, 2, 3, 4, 5]
+        self.assertEqual(m.pack(),
+                         'Hello, world - \x00\x01\x02\x03\x04\x05')
+
 
 class MyTargetMessage(BaseMessage):
     # inherited from the parent message

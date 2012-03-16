@@ -374,8 +374,9 @@ class VariableRawPayload(BaseField):
 
     def __init__(self, length_provider, **kwargs):
         BaseField.__init__(self, **kwargs)
-        self.length_provider = self._ph2f(length_provider)
-        self.length_provider._associate_length_consumer(self)
+        if length_provider is not None:
+            self.length_provider = self._ph2f(length_provider)
+            self.length_provider._associate_length_consumer(self)
 
     @property
     def bytes_required(self):
@@ -393,8 +394,9 @@ class BaseVariableByteSequence(BaseField):
     def __init__(self, make_format, length_provider, **kwargs):
         BaseField.__init__(self, **kwargs)
         self.make_format = make_format
-        self.length_provider = self._ph2f(length_provider)
-        self.length_provider._associate_length_consumer(self)
+        if length_provider is not None:
+            self.length_provider = self._ph2f(length_provider)
+            self.length_provider._associate_length_consumer(self)
 
     @property
     def bytes_required(self):
