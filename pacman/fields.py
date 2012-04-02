@@ -360,6 +360,54 @@ class LengthField(BaseField):
         return self.getval() * self.multiplier
 
 
+class ConditionalField(BaseField):
+    """Field which may or may not be included depending on some condition
+
+    In some protocols, there exist fields which may or may not be present
+    depending on the values of other fields that would have already been
+    parsed at this point in time.  Wrapping such fields in  a ConditionalField
+    allows us to define a function to examine that state and only have the
+    field capture the bytes if the conditions are right.
+
+    :param field: The field which should handle the parsing if the condition
+        evaluates to true.
+
+    :param condition: This is a function which is given access to the parent
+        message that is expected to return a boolean value.  If the value
+        is true, then ``field`` will handle the bytes.  If not, then the
+        field will be skipped and left with its default value (None).
+
+    """
+
+    def __init__(self, field, condition, **kwargs):
+        BaseField.__init__(self, **kwargs)
+        self.field = field.create_instance(self._parent)
+        self.condition = condition
+
+    @property
+    def bytes_required(self):
+        if self.condition(self._parent):
+            return self.field.bytes_required
+        else:
+            return 0
+
+    def pack(self, stream):
+        if self.condition(self._parent):
+            self.field.pack(stream)
+
+    def unpack(self, data):
+        # length of data will be determined by bytes_required output value
+        # which is in turn determined by our condition evaluation
+        if len(data) > 0:
+            self.field.unpack(data)
+
+    def getval(self):
+        return self.field.getval()
+
+    def setval(self, value):
+        return self.field.setval(value)
+
+
 class VariableRawPayload(BaseField):
     """Variable length raw (byte string) field
 

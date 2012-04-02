@@ -3,9 +3,8 @@ from pacman.fields import BitField, BitBool, BitNum, UBInt8, UBInt16, UBInt32, \
     UBInt64, SBInt8, SBInt16, SBInt32, SBInt64, ULInt8, ULInt16, ULInt32, ULInt64, \
     SLInt8, SLInt16, SLInt32, SLInt64, LengthField, UBInt8Sequence, SBInt8Sequence, \
     DispatchField, FieldProperty, VariableRawPayload, DependentField, DispatchTarget, \
-    Magic, UBInt24
+    Magic, UBInt24, ConditionalField
 from pacman.message import BaseMessage
-from pacman.test.examples.test_network_stack import UDPFrame
 import struct
 import unittest
 
@@ -52,6 +51,10 @@ class SuperMessage(BaseMessage):
     slint16 = SLInt16()
     slint32 = SLInt32()
     slint64 = SLInt64()
+
+    # optional
+    optional_one = ConditionalField(UBInt8(), lambda m: m.options.b1)
+    optional_two = ConditionalField(UBInt8(), lambda m: m.options.b2)
 
     # sequences with variable lengths
     ubseql = LengthField(UBInt8())
@@ -118,6 +121,9 @@ class TestSuperField(unittest.TestCase):
         s.slint32 = -9570
         s.slint64 = -29349579
 
+        s.optional_one = 1
+        s.optional_two = 2
+
         s.ubseq = tuple(range(10))
         s.sbseq = tuple([x - 5 for x in range(10)])
         s.ubseqf = tuple(range(5))
@@ -145,6 +151,8 @@ class TestSuperField(unittest.TestCase):
             elif key == 'submessage':
                 self.assertEqual(sm2_value.ubseq, sm.ubseq)
                 self.assertEqual(sm2_value.remaining, sm.submessage.remaining)
+            elif key == 'optional_one':
+                self.assertEqual(sm2_value, None)
             else:
                 sm1_value = getattr(sm, key)
                 self.assertEqual(sm2_value, sm1_value, "%s: %s != %s, types(%s, %s)" % (key, sm2_value, sm1_value, type(sm2_value), type(sm1_value)))
@@ -393,6 +401,36 @@ class TestBitFields(unittest.TestCase):
         self.assertEqual(inst.b1, inst2.b1)
         self.assertEqual(inst.b2, inst2.b2)
         self.assertEqual(inst.remaining, inst2.remaining)
+
+
+# message where f2 is only defined if f2 is 255
+class Conditional(BaseMessage):
+    f1 = UBInt8()
+    f2 = ConditionalField(UBInt8(), lambda m: m.f1 == 255)
+
+
+class TestConditionalField(unittest.TestCase):
+
+    def test_conditional_pack(self):
+        m1 = Conditional()
+        m1.f1 = 0x91
+        self.assertEqual(m1.pack(), '\x91')
+        
+        m2 = Conditional()
+        m2.f1 = 0xFF
+        m2.f2 = 0x09
+        self.assertEqual(m2.pack(), '\xff\x09')
+
+    def test_conditional_rx(self):
+        m1 = Conditional()
+        m1.unpack('\x1f')
+        self.assertEqual(m1.f1, 0x1f)
+        self.assertEqual(m1.f2, None)
+        
+        m2 = Conditional()
+        m2.unpack('\xff\x1f')
+        self.assertEqual(m2.f1, 0xff)
+        self.assertEqual(m2.f2, 0x1f)
 
 if __name__ == "__main__":
     unittest.main()
