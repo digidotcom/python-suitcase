@@ -102,6 +102,9 @@ class Magic(BaseField):
     def unpack(self, data):
         assert(data == self.expected_sequence)
 
+    def __repr__(self):
+        return "Magic(%r)" % (self.expected_sequence,)
+
 
 class FieldProperty(BaseField):
     """Provide the ability to define "Property" getter/setters for other fields
@@ -146,7 +149,6 @@ class FieldProperty(BaseField):
         self.onset = onset
         self.field = self._ph2f(field)
         self.bytes_required = 0
-
 
     def _default_onget(self, value):
         return value
@@ -717,6 +719,9 @@ class _BitFieldField(object):
     def __init__(self, *args, **kwargs):
         pass
 
+    def __repr__(self):
+        return repr(self.viewget())
+
     def __new__(cls, *args, **kwargs):
         if 'instantiate' in kwargs:
             return object.__new__(cls, *args, **kwargs)
@@ -851,6 +856,14 @@ class BitField(BaseField):
             self._bitfield_map[key].viewset(value)
         else:
             self.__dict__[key] = value
+
+    def __repr__(self):
+        sio = StringIO()
+        sio.write("BitField(\n")
+        for key, field in self._ordered_bitfields:
+            sio.write("    %s=%r,\n" % (key, field))
+        sio.write("  )")
+        return sio.getvalue()
 
     def getval(self):
         return self
