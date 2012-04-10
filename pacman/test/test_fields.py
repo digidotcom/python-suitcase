@@ -1,9 +1,10 @@
 from StringIO import StringIO
-from pacman.fields import BitField, BitBool, BitNum, UBInt8, UBInt16, UBInt32, \
-    UBInt64, SBInt8, SBInt16, SBInt32, SBInt64, ULInt8, ULInt16, ULInt32, ULInt64, \
-    SLInt8, SLInt16, SLInt32, SLInt64, LengthField, UBInt8Sequence, SBInt8Sequence, \
-    DispatchField, FieldProperty, VariableRawPayload, DependentField, DispatchTarget, \
-    Magic, UBInt24, ConditionalField
+from pacman.crc import crc16_ccitt
+from pacman.fields import DependentField, LengthField, VariableRawPayload, \
+    Magic, BitField, BitBool, BitNum, UBInt8, UBInt16, UBInt24, UBInt32, UBInt64, \
+    SBInt8, SBInt16, SBInt32, SBInt64, ULInt8, ULInt16, ULInt32, ULInt64, SLInt8, \
+    SLInt16, SLInt32, SLInt64, ConditionalField, UBInt8Sequence, SBInt8Sequence, \
+    FieldProperty, DispatchField, DispatchTarget, CRCField
 from pacman.message import BaseMessage
 import struct
 import unittest
@@ -79,6 +80,11 @@ class SuperMessage(BaseMessage):
         0xEF: SuperChild
     })
 
+    # checksum starts after beginning magic, ends before
+    # the checksum
+    crc = CRCField(UBInt16(), crc16_ccitt, 2, -3)
+    eof = Magic('~')
+
 
 class TestMagic(unittest.TestCase):
 
@@ -153,9 +159,12 @@ class TestSuperField(unittest.TestCase):
                 self.assertEqual(sm2_value.remaining, sm.submessage.remaining)
             elif key == 'optional_one':
                 self.assertEqual(sm2_value, None)
+            elif key == 'crc':
+                pass  # validity check baked into protocol
             else:
                 sm1_value = getattr(sm, key)
-                self.assertEqual(sm2_value, sm1_value, "%s: %s != %s, types(%s, %s)" % (key, sm2_value, sm1_value, type(sm2_value), type(sm1_value)))
+                self.assertEqual(sm2_value, sm1_value, "%s: %s != %s, types(%s, %s)" %
+                                 (key, sm2_value, sm1_value, type(sm2_value), type(sm1_value)))
 
     def test_repr_works(self):
         # just make sure nothing creashes
@@ -415,7 +424,7 @@ class TestConditionalField(unittest.TestCase):
         m1 = Conditional()
         m1.f1 = 0x91
         self.assertEqual(m1.pack(), '\x91')
-        
+
         m2 = Conditional()
         m2.f1 = 0xFF
         m2.f2 = 0x09
@@ -426,7 +435,7 @@ class TestConditionalField(unittest.TestCase):
         m1.unpack('\x1f')
         self.assertEqual(m1.f1, 0x1f)
         self.assertEqual(m1.f2, None)
-        
+
         m2 = Conditional()
         m2.unpack('\xff\x1f')
         self.assertEqual(m2.f1, 0xff)

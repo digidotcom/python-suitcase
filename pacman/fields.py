@@ -82,6 +82,87 @@ class BaseField(object):
         self._value = value
 
 
+class CRCField(BaseField):
+    r"""Field representing CRC (Cyclical Redundancy Check) in a message
+
+    CRC checks and calculation frequently work quite differently
+    from other fields in a protocol and as such are treated differently
+    by the messag container.  In particular, a CRCField requires
+    special steps at either the beginning or end of the message
+    pack/unpack process.  For each CRCField, we specify the following:
+
+    :param field: The underlying field defining how the checksum will
+        be stored.  This should match the size of the checksum in
+        whatever algorithm is being used (16 bits for CRC16).
+    :param algo: The algorithm to be used for performing the checksum.
+       This is basically a function that takes a chunk of data and
+       gives the checksum.  Several of these are provided out of the
+       box in ``pacman.crc``.
+    :param start: The offset in the overall message at which we should
+        start the checksum.  This may be positive (from the start) or
+        negative (from the end of the message).
+    :param end: The offset in the overall message at which we should
+        end the checksum algo.  This may be positive (from the start)
+        or negative (from the end of the message).
+
+    A quick example of a message with a checksum is in order::
+
+        class MyChecksummedMessage(BaseMessage):
+            soh = Magic('\x1f\x1f')
+            message_id = UBInt16()
+            sequence_number = UBInt8()
+            payload_length = LengthField(UBInt16())
+            payload = VariableRawPayload(payload_length)
+
+            # crc starts after soh and ends before crc
+            crc = CRCField(UBInt16(), crc16_ccitt, 2, -3)
+            eof = Magic('~')
+
+    """
+
+    def __init__(self, field, algo, start, end, **kwargs):
+        BaseField.__init__(self, **kwargs)
+        self.field = field.create_instance(self._parent)
+        self.field.setval(0)
+        self.algo = algo
+        self.start = start
+        self.end = end
+        self._value = None
+
+    @property
+    def bytes_required(self):
+        return self.field.bytes_required
+
+    def is_valid(self, data):
+        """Return true if the checksum passes on the provided data"""
+        # the data is valid if the checksum of the data
+        # starting witht he provided checksum ends up at
+        # 0.
+        recorded_checksum = self.field.getval()
+        actual_checksum = self.algo(data[self.start:self.end])
+        return (recorded_checksum == actual_checksum)
+
+    def packed_checksum(self, data):
+        """Given the data of the entire packet reutrn the checksum bytes"""
+        self.field.setval(self.algo(data[self.start:self.end]))
+        sio = StringIO()
+        self.field.pack(sio)
+        return sio.getvalue()
+
+    def getval(self):
+        return self.field.getval()
+
+    def setval(self):
+        raise ValueError("CRC will be set automatically")
+
+    def pack(self, stream):
+        # write placeholder during the first pass
+        stream.write('\x00' * self.field.bytes_required)
+
+    def unpack(self, data):
+        self.field.unpack(data)
+
+
 class Magic(BaseField):
     """Represent Byte Magic (fixed, expected sequence of bytes)"""
 
@@ -338,7 +419,6 @@ class LengthField(BaseField):
 
     def _associate_length_consumer(self, target_field):
         def _length_value_provider():
-            from StringIO import StringIO
             sio = StringIO()
             target_field.pack(sio)
             target_field_length = len(sio.getvalue())
