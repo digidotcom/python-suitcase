@@ -12,6 +12,18 @@ try:
     from cStringIO import StringIO
 except ImportError:
     from StringIO import StringIO
+try:
+    from functools import partial
+except ImportError:
+    def partial(func, *args, **kwargs):
+        def newfunc(*fargs, **fkeywords):
+            newkeywords = kwargs.copy()
+            newkeywords.update(fkeywords)
+            return func(*(args + fargs), **newkeywords)
+        newfunc.func = func
+        newfunc.args = args
+        newfunc.keywords = kwargs
+        return newfunc
 
 
 class StreamProtocolHandler(object):
@@ -117,13 +129,14 @@ class StreamProtocolHandler(object):
         """
         assert isinstance(new_bytes, str)
         self._available_bytes += new_bytes
+        callbacks = []
         try:
             while True:
                 packet = self._packet_generator.next()
                 if packet is None:
                     break
                 else:
-                    self.packet_callback(packet)
+                    callbacks.append(partial(self.packet_callback, packet))
         except Exception:
             # When we receive an exception, we assume that the _available_bytes
             # has already been updated and we just choked on a field.  That
@@ -133,6 +146,13 @@ class StreamProtocolHandler(object):
             # TODO: black hole may not be the best.  What should the logging
             # behavior be?
             self.reset()
+
+        # callbacks are partials that are boudn to packet already.  We do
+        # this in order to separate out parsing activity (and error handling)
+        # from the execution of callbacks.  Callbacks should not in any way
+        # rely on the parsers position in the byte stream.
+        for callback in callbacks:
+            callback()
 
     def reset(self):
         """Reset the internal state machine to a fresh state
