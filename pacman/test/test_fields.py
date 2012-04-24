@@ -1,10 +1,10 @@
 from StringIO import StringIO
 from pacman.crc import crc16_ccitt
-from pacman.fields import DependentField, LengthField, VariableRawPayload, \
-    Magic, BitField, BitBool, BitNum, UBInt8, UBInt16, UBInt24, UBInt32, UBInt64, \
-    SBInt8, SBInt16, SBInt32, SBInt64, ULInt8, ULInt16, ULInt32, ULInt64, SLInt8, \
-    SLInt16, SLInt32, SLInt64, ConditionalField, UBInt8Sequence, SBInt8Sequence, \
-    FieldProperty, DispatchField, DispatchTarget, CRCField
+from pacman.fields import DependentField, LengthField, VariableRawPayload, Magic, \
+    BitField, BitBool, BitNum, UBInt8, UBInt16, UBInt24, UBInt32, UBInt64, SBInt8, \
+    SBInt16, SBInt32, SBInt64, ULInt8, ULInt16, ULInt32, ULInt64, SLInt8, SLInt16, \
+    SLInt32, SLInt64, ConditionalField, UBInt8Sequence, SBInt8Sequence, \
+    FieldProperty, DispatchField, DispatchTarget, CRCField, Payload
 from pacman.message import BaseMessage
 import struct
 import unittest
@@ -325,6 +325,60 @@ class MyBasicDispatchMessage(BaseMessage):
         0x01: MyOtherTargetMessage,
         None: MyDefaultTargetMessage
     })
+
+
+class BasicGreedy(BaseMessage):
+    a = UBInt8()
+    b = UBInt8()
+    payload = Payload()
+
+
+class BoxedGreedy(BaseMessage):
+    a = LengthField(UBInt8())
+    b = UBInt8()
+    payload = Payload()
+    c = UBInt16()
+    d = VariableRawPayload(a)
+
+
+class TestGreedyFields(unittest.TestCase):
+
+    def test_unpack_basic_greedy(self):
+        # Test case with trailing greedy payload
+        m = BasicGreedy()
+        m.unpack("\x00\x01Hello, you greedy, greedy World!")
+        self.assertEqual(m.a, 0x00)
+        self.assertEqual(m.b, 0x01)
+        self.assertEqual(m.payload, "Hello, you greedy, greedy World!")
+
+
+    def test_unpack_boxed_greedy(self):
+        # Test case where fields exist on either side of payload
+
+        m = BoxedGreedy()
+        m.unpack("\x05\x00This is the payload\x00\x15ABCDE")
+        self.assertEqual(m.a, 5)
+        self.assertEqual(m.b, 0)
+        self.assertEqual(m.payload, "This is the payload")
+        self.assertEqual(m.c, 0x15)
+        self.assertEqual(m.d, "ABCDE")
+
+    def test_pack_basic_greedy(self):
+        m = BasicGreedy()
+        m.a = 10
+        m.b = 20
+        m.payload = "This is a packed greedy payload"
+        self.assertEqual(m.pack(), '\n\x14This is a packed greedy payload')
+
+    def test_pack_boxed_greedy(self):
+        m = BoxedGreedy()
+        m.b = 20
+        m.c = 300
+        m.d = "ABCD"
+        m.payload = "My length isn't declared and I am in the middle"
+        self.assertEqual(m.pack(),
+                         "\x04\x14My length isn't declared and I am in the "
+                         "middle\x01,ABCD")
 
 
 class TestMessageDispatching(unittest.TestCase):

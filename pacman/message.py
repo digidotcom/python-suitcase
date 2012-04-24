@@ -56,13 +56,55 @@ class Packer(object):
         self.unpack_stream(StringIO(data))
 
     def unpack_stream(self, stream):
+        """Unpack bytes from a stream of data field-by-field
+
+        In the most basic case, the basic algorithm here is as follows::
+
+            for _name, field in self.ordered_fields:
+               length = field.bytes_required
+               data = stream.read(length)
+               field.unpack(data)
+
+        This logic is complicated somewhat by the handling of variable length
+        greedy fields (there may only be one).  The logic when we see a
+        greedy field (bytes_required returns None) in the stream is to
+        pivot and parse the remaining fields starting from the last and
+        moving through the stream backwards.  There is also some special
+        logic present for dealing with checksum fields.
+
+        """
         crc_fields = []
-        for _name, field in self.ordered_fields:
+        greedy_field = None
+        # go through the fields from first to last.  If we hit a greedy
+        # field, break out of the loop
+        for i, (_name, field) in enumerate(self.ordered_fields):
             if isinstance(field, CRCField):
                 crc_fields.append(field)
             length = field.bytes_required
-            data = stream.read(length)
+            if length is None:
+                greedy_field = field
+                break
+            else:
+                data = stream.read(length)
             field.unpack(data)
+
+        if greedy_field is not None:
+            remaining_data = stream.read()
+            inverted_stream = StringIO(remaining_data[::-1])
+
+            # work through the remaining fields in reverse order in order
+            # to narrow in on the right bytes for the greedy field
+            reversed_remaining_fields = self.ordered_fields[(i + 1):][::-1]
+            for _name, field in reversed_remaining_fields:
+                print _name, field
+                if isinstance(field, CRCField):
+                    crc_fields.append(field)
+                length = field.bytes_required
+                data = inverted_stream.read(length)[::-1]
+                field.unpack(data)
+
+            greedy_data_chunk = inverted_stream.read()[::-1]
+            greedy_field.unpack(greedy_data_chunk)
 
         if len(crc_fields) > 0:
             data = stream.getvalue()

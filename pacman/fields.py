@@ -490,7 +490,7 @@ class ConditionalField(BaseField):
         return self.field.setval(value)
 
 
-class VariableRawPayload(BaseField):
+class Payload(BaseField):
     """Variable length raw (byte string) field
 
     This field is expected to be used with a LengthField.  The variable
@@ -498,25 +498,37 @@ class VariableRawPayload(BaseField):
     message pack and vice-versa for unpack.
 
     :param length_provider: The LengthField with which this variable
-        length payload is associated.
+        length payload is associated.  If not included, it is assumed that
+        the length_provider should consume the remainder of the bytes
+        available in the string.  This is only valid in cases where the
+        developer knows that they will be dealing with a fixed sequence
+        of bytes (already boxed).
 
     """
 
-    def __init__(self, length_provider, **kwargs):
+    def __init__(self, length_provider=None, **kwargs):
         BaseField.__init__(self, **kwargs)
         if length_provider is not None:
             self.length_provider = self._ph2f(length_provider)
             self.length_provider._associate_length_consumer(self)
+        else:
+            self.length_provider = None
 
     @property
     def bytes_required(self):
-        return self.length_provider.get_adjusted_length()
+        if self.length_provider is None:
+            return  None
+        else:
+            return self.length_provider.get_adjusted_length()
 
     def pack(self, stream):
         stream.write(self._value)
 
     def unpack(self, data):
         self._value = data
+
+# keep for backwards compatability
+VariableRawPayload = Payload
 
 
 class BaseVariableByteSequence(BaseField):
