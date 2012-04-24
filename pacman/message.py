@@ -185,6 +185,25 @@ class BaseMessage(object):
 
     __metaclass__ = MessageMeta
 
+    @classmethod
+    def from_data(cls, data):
+        """Create a new, populated message from some data
+
+        This factory method is identical to doing the following, it just takes
+        one line instead of two and looks nicer in general::
+
+            m = MyMessage()
+            m.unpack(data)
+
+        Can be rewritten as just::
+
+            m = MyMessage.from_data(data)
+
+        """
+        m = cls()
+        m.unpack(data)
+        return m
+
     def __init__(self):
         self._key_to_field = {}
         self._parent = None

@@ -144,8 +144,7 @@ class TestSuperField(unittest.TestCase):
     def test_super_message(self):
         sm = self._create_supermessage()
         packed = sm.pack()
-        sm2 = SuperMessage()
-        sm2.unpack(packed)
+        sm2 = SuperMessage.from_data(packed)
 
         for key, field in sm2:
             sm2_value = field.getval()
@@ -183,8 +182,7 @@ class TestFieldProperty(unittest.TestCase):
                                     onset=lambda v: tuple(int(x) for x
                                                           in v.split(".", 1)))
 
-        msg = MyMessage()
-        msg.unpack('\x10\x03')
+        msg = MyMessage.from_data('\x10\x03')
         self.assertEqual(msg._version, (16, 3))
         self.assertEqual(msg.version, "16.03")
 
