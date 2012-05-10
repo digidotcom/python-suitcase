@@ -1,9 +1,10 @@
 from StringIO import StringIO
 from pacman.crc import crc16_ccitt
-from pacman.fields import DependentField, LengthField, VariableRawPayload, Magic, \
-    BitField, BitBool, BitNum, UBInt8, UBInt16, UBInt24, UBInt32, UBInt64, SBInt8, \
-    SBInt16, SBInt32, SBInt64, ULInt8, ULInt16, ULInt32, ULInt64, SLInt8, SLInt16, \
-    SLInt32, SLInt64, ConditionalField, UBInt8Sequence, SBInt8Sequence, \
+from pacman.exceptions import PacmanProgrammingError
+from pacman.fields import DependentField, LengthField, VariableRawPayload, \
+    Magic, BitField, BitBool, BitNum, UBInt8, UBInt16, UBInt24, UBInt32, UBInt64, \
+    SBInt8, SBInt16, SBInt32, SBInt64, ULInt8, ULInt16, ULInt32, ULInt64, SLInt8, \
+    SLInt16, SLInt32, SLInt64, ConditionalField, UBInt8Sequence, SBInt8Sequence, \
     FieldProperty, DispatchField, DispatchTarget, CRCField, Payload
 from pacman.message import BaseMessage
 import struct
@@ -90,7 +91,7 @@ class TestMagic(unittest.TestCase):
 
     def test_magic(self):
         magic_field = Magic('\xAA').create_instance(None)
-        self.assertRaises(ValueError, magic_field.setval)
+        self.assertRaises(PacmanProgrammingError, magic_field.setval)
 
 
 class TestSuperField(unittest.TestCase):
@@ -244,7 +245,7 @@ class TestLengthField(unittest.TestCase):
         msg = self.MyMuiltipliedLengthMessage()
         payload = '\x01'  # 1-byte is not modulo 8
         msg.payload = payload
-        self.assertRaises(ValueError, msg.pack)
+        self.assertRaises(PacmanProgrammingError, msg.pack)
 
     def test_multiplied_length_unpack(self):
         msg = self.MyMuiltipliedLengthMessage()
@@ -349,7 +350,6 @@ class TestGreedyFields(unittest.TestCase):
         self.assertEqual(m.b, 0x01)
         self.assertEqual(m.payload, "Hello, you greedy, greedy World!")
 
-
     def test_unpack_boxed_greedy(self):
         # Test case where fields exist on either side of payload
 
@@ -404,7 +404,8 @@ class TestMessageDispatching(unittest.TestCase):
 
     def test_foreign_type(self):
         msg = MyBasicDispatchMessage()
-        self.assertRaises(ValueError, setattr, msg, 'body', SuperMessage())
+        self.assertRaises(PacmanProgrammingError,
+                          setattr, msg, 'body', SuperMessage())
 
     def test_default_dispatch(self):
         msg = MyBasicDispatchMessage()
@@ -440,7 +441,8 @@ class TestBitFields(unittest.TestCase):
     def test_bad_operations(self):
         field_proto = BitField(7,
             num=BitNum(7))
-        self.assertRaises(ValueError, field_proto.create_instance, None)
+        self.assertRaises(PacmanProgrammingError,
+                          field_proto.create_instance, None)
 
     def test_explicit_field_override(self):
         field_proto = BitField(16, ULInt16(),

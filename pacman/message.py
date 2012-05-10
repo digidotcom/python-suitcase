@@ -1,4 +1,7 @@
+from pacman.exceptions import PacmanChecksumException, PacmanException, \
+    PacmanPackException, PacmanParseError
 from pacman.fields import FieldPlaceholder, CRCField
+import sys
 try:
     from cStringIO import StringIO
 except ImportError:
@@ -7,10 +10,6 @@ except ImportError:
 
 class ParseError(Exception):
     """Exception raied when there is an error parsing"""
-
-
-class CRCError(ParseError):
-    """ParseError raised when a CRC doesn't match expected value"""
 
 
 class Packer(object):
@@ -36,12 +35,14 @@ class Packer(object):
                     crc_fields.append((field, crc_offset))
                 else:
                     field.pack(stream)
-            except:
-                # TODO: don't just print... give a better exception in some
-                # way, shape, or form.
-                print ("Error packing field '%s' with type %s" %
-                       (name, type(field)))
-                raise
+            except PacmanException:
+                raise  # just reraise the same exception object
+            except Exception:
+                # keep the original traceback information, see
+                # http://stackoverflow.com/questions/3847503/wrapping-exceptions-in-python
+                trace = sys.exc_info()[2]
+                raise PacmanPackException("Unexpected exception during pack "
+                                          "of %r" % name), None, trace
 
         # if there is a crc value, seek back to the field and
         # pack it with the right value
@@ -77,7 +78,7 @@ class Packer(object):
         greedy_field = None
         # go through the fields from first to last.  If we hit a greedy
         # field, break out of the loop
-        for i, (_name, field) in enumerate(self.ordered_fields):
+        for i, (name, field) in enumerate(self.ordered_fields):
             if isinstance(field, CRCField):
                 crc_fields.append(field)
             length = field.bytes_required
@@ -86,7 +87,20 @@ class Packer(object):
                 break
             else:
                 data = stream.read(length)
-            field.unpack(data)
+                if len(data) != length:
+                    raise PacmanParseError("While attempting to parse field "
+                                           "%r we tried to read %s bytes but "
+                                           "we were only able to read %s." %
+                                           (name, length, len(data)))
+
+            try:
+                field.unpack(data)
+            except PacmanException:
+                raise  # just re-raise these
+            except Exception:
+                trace = sys.exc_info()[2]
+                raise PacmanParseError("Unexpected exception while unpacking "
+                                       "field %r" % name), None, trace
 
         if greedy_field is not None:
             remaining_data = stream.read()
@@ -96,21 +110,32 @@ class Packer(object):
             # to narrow in on the right bytes for the greedy field
             reversed_remaining_fields = self.ordered_fields[(i + 1):][::-1]
             for _name, field in reversed_remaining_fields:
-                print _name, field
                 if isinstance(field, CRCField):
                     crc_fields.append(field)
                 length = field.bytes_required
                 data = inverted_stream.read(length)[::-1]
-                field.unpack(data)
+                if len(data) != length:
+                    raise PacmanParseError("While attempting to parse field "
+                                           "%r we tried to read %s bytes but "
+                                           "we were only able to read %s." %
+                                           (name, length, len(data)))
+                try:
+                    field.unpack(data)
+                except PacmanException:
+                    raise  # just re-raise these
+                except Exception:
+                    trace = sys.exc_info()[2]
+                    raise PacmanParseError("Unexpected exception while "
+                                           "unpacking field "
+                                           "%r" % name), None, trace
 
             greedy_data_chunk = inverted_stream.read()[::-1]
             greedy_field.unpack(greedy_data_chunk)
 
-        if len(crc_fields) > 0:
+        if crc_fields:
             data = stream.getvalue()
             for crc_field in crc_fields:
-                if not crc_field.is_valid(data):
-                    raise CRCError()
+                crc_field.validate(data)
 
 
 class MessageMeta(type):

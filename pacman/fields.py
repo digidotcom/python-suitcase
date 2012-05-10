@@ -1,8 +1,10 @@
+from pacman.exceptions import PacmanChecksumException, PacmanProgrammingError, \
+    PacmanParseError, PacmanException, PacmanPackStructException
+import struct
 try:
     from cStringIO import StringIO
 except ImportError:
     import StringIO
-import struct
 
 
 class FieldPlaceholder(object):
@@ -133,14 +135,14 @@ class CRCField(BaseField):
     def bytes_required(self):
         return self.field.bytes_required
 
-    def is_valid(self, data):
-        """Return true if the checksum passes on the provided data"""
-        # the data is valid if the checksum of the data
-        # starting witht he provided checksum ends up at
-        # 0.
+    def validate(self, data):
+        """Raises PacmanChecksumException if not valid"""
         recorded_checksum = self.field.getval()
         actual_checksum = self.algo(data[self.start:self.end])
-        return (recorded_checksum == actual_checksum)
+        if (recorded_checksum != actual_checksum):
+            raise PacmanChecksumException(
+                "recorded checksum %r did not match actual %r.  full data: %r",
+                recorded_checksum, actual_checksum, data)
 
     def packed_checksum(self, data):
         """Given the data of the entire packet reutrn the checksum bytes"""
@@ -153,7 +155,7 @@ class CRCField(BaseField):
         return self.field.getval()
 
     def setval(self):
-        raise ValueError("CRC will be set automatically")
+        raise PacmanProgrammingError("CRC will be set automatically")
 
     def pack(self, stream):
         # write placeholder during the first pass
@@ -175,7 +177,7 @@ class Magic(BaseField):
         return self.expected_sequence
 
     def setval(self):
-        raise ValueError("One does not simply modify Magic")
+        raise PacmanProgrammingError("One does not simply modify Magic")
 
     def pack(self, stream):
         stream.write(self.expected_sequence)
@@ -356,7 +358,8 @@ class DispatchTarget(BaseField):
             vtype = type(value)
             key = self.inverse_dispatch_mapping[vtype]
         except KeyError:
-            raise ValueError("The type specified is not in the dispatch table")
+            raise PacmanProgrammingError("The type specified is not in the "
+                                         "dispatch table")
 
         # OK, things check out.  Set both the value here and the
         # type byte value
@@ -374,7 +377,8 @@ class DispatchTarget(BaseField):
         if target_msg_type is None:
             target_msg_type = self.dispatch_mapping.get(None)
         if target_msg_type is None:  # still none
-            raise ValueError("Input data contains type byte not contained in mapping")
+            raise PacmanParseError("Input data contains type byte not"
+                                   " contained in mapping")
         message_instance = target_msg_type()
         self.setval(message_instance)
         self._value.unpack(data)
@@ -415,7 +419,7 @@ class LengthField(BaseField):
         return length_value
 
     def setval(self, value):
-        raise AttributeError("Cannot set the value of a LengthField")
+        raise PacmanProgrammingError("Cannot set the value of a LengthField")
 
     def _associate_length_consumer(self, target_field):
         def _length_value_provider():
@@ -423,14 +427,14 @@ class LengthField(BaseField):
             target_field.pack(sio)
             target_field_length = len(sio.getvalue())
             if not target_field_length % self.multiplier == 0:
-                raise ValueError("Payload length not divisible by %s"
-                                 % self.multiplier)
+                raise PacmanProgrammingError("Payload length not divisible "
+                                             "by %s" % self.multiplier)
             return (target_field_length / self.multiplier)
         self.length_value_provider = _length_value_provider
 
     def pack(self, stream):
         if self.length_value_provider is None:
-            raise Exception("No length_provider added to this LengthField")
+            raise PacmanException("No length_provider added to this LengthField")
         self.length_field._value = self.length_value_provider()
         self.length_field.pack(stream)
 
@@ -546,14 +550,20 @@ class BaseVariableByteSequence(BaseField):
 
     def pack(self, stream):
         sfmt = self.make_format(len(self._value))
-        stream.write(struct.pack(sfmt, *self._value))
+        try:
+            stream.write(struct.pack(sfmt, *self._value))
+        except struct.error, e:
+            raise PacmanPackStructException(e)
 
     def unpack(self, data):
         assert len(data) == self.bytes_required
 
         length = self.bytes_required
         sfmt = self.make_format(length)
-        self._value = struct.unpack(sfmt, data)
+        try:
+            self._value = struct.unpack(sfmt, data)
+        except struct.error, e:
+            raise PacmanPackStructException(e)
 
 
 class DependentField(BaseField):
@@ -912,8 +922,8 @@ class BitField(BaseField):
         self._ordered_bitfields = []
         self._bitfield_map = {}
         if number_bits % 8 != 0:
-            raise ValueError(
-                "Number of bits must be a factor of 8, was %d" % number_bits)
+            raise PacmanProgrammingError("Number of bits must be a factor of "
+                                         "8, was %d" % number_bits)
 
         self.number_bits = number_bits
         self.number_bytes = number_bits / 8
@@ -961,7 +971,8 @@ class BitField(BaseField):
         return self
 
     def setval(self, value):
-        raise Exception()
+        raise PacmanProgrammingError("Setting the value of a bitfield "
+                                     "directly is prohibited")
 
     def pack(self, stream):
         value = 0
