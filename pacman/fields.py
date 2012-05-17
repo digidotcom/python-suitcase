@@ -183,7 +183,10 @@ class Magic(BaseField):
         stream.write(self.expected_sequence)
 
     def unpack(self, data):
-        assert(data == self.expected_sequence)
+        if not data == self.expected_sequence:
+            raise PacmanParseError(
+                "Expected sequence %r for magic field but got %r on "
+                "message %r" % (self.expected_sequence, data, self._parent))
 
     def __repr__(self):
         return "Magic(%r)" % (self.expected_sequence,)
@@ -434,8 +437,8 @@ class LengthField(BaseField):
 
     def pack(self, stream):
         if self.length_value_provider is None:
-            raise PacmanException("No length_provider added to"
-                                  " this LengthField")
+            raise PacmanException("No length_provider added to this "
+                                  "LengthField")
         self.length_field._value = self.length_value_provider()
         self.length_field.pack(stream)
 
@@ -693,7 +696,8 @@ class BaseStructField(BaseField):
     def pack(self, stream):
         keep_bytes = getattr(self, 'KEEP_BYTES', None)
         if keep_bytes is not None:
-            to_write = struct.pack(self.PACK_FORMAT, self._value)[-keep_bytes:]
+            to_write = struct.pack(self.PACK_FORMAT,
+                                   self._value)[-keep_bytes:]
         else:
             to_write = struct.pack(self.PACK_FORMAT, self._value)
         stream.write(to_write)
@@ -701,7 +705,7 @@ class BaseStructField(BaseField):
     def unpack(self, data):
         value = 0
         for i, byte in enumerate(reversed(
-                         struct.unpack(self.UNPACK_FORMAT, data))):
+                            struct.unpack(self.UNPACK_FORMAT, data))):
             value |= (byte << (i * 8))
         self._value = value
 
