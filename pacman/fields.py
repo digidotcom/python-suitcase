@@ -434,7 +434,8 @@ class LengthField(BaseField):
 
     def pack(self, stream):
         if self.length_value_provider is None:
-            raise PacmanException("No length_provider added to this LengthField")
+            raise PacmanException("No length_provider added to"
+                                  " this LengthField")
         self.length_field._value = self.length_value_provider()
         self.length_field.pack(stream)
 
@@ -469,6 +470,12 @@ class ConditionalField(BaseField):
         BaseField.__init__(self, **kwargs)
         self.field = field.create_instance(self._parent)
         self.condition = condition
+
+    def __repr__(self):
+        if self.condition(self._parent):
+            return repr(self.field)
+        else:
+            return "<ConditionalField: not included>"
 
     @property
     def bytes_required(self):
@@ -512,7 +519,14 @@ class Payload(BaseField):
 
     def __init__(self, length_provider=None, **kwargs):
         BaseField.__init__(self, **kwargs)
-        if length_provider is not None:
+        if isinstance(length_provider, int):
+            class mock_length_provider:
+                @staticmethod
+                def get_adjusted_length():
+                    return length_provider
+
+            self.length_provider = mock_length_provider
+        elif isinstance(length_provider, FieldPlaceholder):
             self.length_provider = self._ph2f(length_provider)
             self.length_provider._associate_length_consumer(self)
         else:
@@ -686,7 +700,8 @@ class BaseStructField(BaseField):
 
     def unpack(self, data):
         value = 0
-        for i, byte in enumerate(reversed(struct.unpack(self.UNPACK_FORMAT, data))):
+        for i, byte in enumerate(reversed(
+                         struct.unpack(self.UNPACK_FORMAT, data))):
             value |= (byte << (i * 8))
         self._value = value
 
