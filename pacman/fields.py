@@ -135,9 +135,14 @@ class CRCField(BaseField):
     def bytes_required(self):
         return self.field.bytes_required
 
-    def validate(self, data):
+    def validate(self, data, offset):
         """Raises PacmanChecksumException if not valid"""
         recorded_checksum = self.field.getval()
+        
+        # replace checksum region with zero
+        data = ''.join((data[:offset],
+                        "\x00" * self.bytes_required,
+                        data[offset+self.bytes_required:])) 
         actual_checksum = self.algo(data[self.start:self.end])
         if (recorded_checksum != actual_checksum):
             raise PacmanChecksumException(
@@ -437,8 +442,7 @@ class LengthField(BaseField):
 
     def pack(self, stream):
         if self.length_value_provider is None:
-            raise PacmanException("No length_provider added to this "
-                                  "LengthField")
+            raise PacmanException("No length_provider added to this LengthField")
         self.length_field._value = self.length_value_provider()
         self.length_field.pack(stream)
 
@@ -696,16 +700,14 @@ class BaseStructField(BaseField):
     def pack(self, stream):
         keep_bytes = getattr(self, 'KEEP_BYTES', None)
         if keep_bytes is not None:
-            to_write = struct.pack(self.PACK_FORMAT,
-                                   self._value)[-keep_bytes:]
+            to_write = struct.pack(self.PACK_FORMAT, self._value)[-keep_bytes:]
         else:
             to_write = struct.pack(self.PACK_FORMAT, self._value)
         stream.write(to_write)
 
     def unpack(self, data):
         value = 0
-        for i, byte in enumerate(reversed(
-                            struct.unpack(self.UNPACK_FORMAT, data))):
+        for i, byte in enumerate(reversed(struct.unpack(self.UNPACK_FORMAT, data))):
             value |= (byte << (i * 8))
         self._value = value
 

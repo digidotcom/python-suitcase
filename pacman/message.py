@@ -80,7 +80,7 @@ class Packer(object):
         # field, break out of the loop
         for i, (name, field) in enumerate(self.ordered_fields):
             if isinstance(field, CRCField):
-                crc_fields.append(field)
+                crc_fields.append((field, stream.tell()))
             length = field.bytes_required
             if length is None:
                 greedy_field = field
@@ -111,7 +111,7 @@ class Packer(object):
             reversed_remaining_fields = self.ordered_fields[(i + 1):][::-1]
             for _name, field in reversed_remaining_fields:
                 if isinstance(field, CRCField):
-                    crc_fields.append(field)
+                    crc_fields.append((field, -stream.tell()))
                 length = field.bytes_required
                 data = inverted_stream.read(length)[::-1]
                 if len(data) != length:
@@ -134,8 +134,8 @@ class Packer(object):
 
         if crc_fields:
             data = stream.getvalue()
-            for crc_field in crc_fields:
-                crc_field.validate(data)
+            for (crc_field, offset) in crc_fields:
+                crc_field.validate(data, offset)
 
 
 class MessageMeta(type):
@@ -226,7 +226,10 @@ class BaseMessage(object):
 
         """
         m = cls()
-        m.unpack(data)
+        try:
+            m.unpack(data)
+        except:
+            raise
         return m
 
     def __init__(self):
