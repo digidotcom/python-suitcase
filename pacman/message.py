@@ -111,7 +111,8 @@ class Packer(object):
             reversed_remaining_fields = self.ordered_fields[(i + 1):][::-1]
             for _name, field in reversed_remaining_fields:
                 if isinstance(field, CRCField):
-                    crc_fields.append((field, -stream.tell()))
+                    crc_fields.append(
+                    (field, -inverted_stream.tell() - field.bytes_required))
                 length = field.bytes_required
                 data = inverted_stream.read(length)[::-1]
                 if len(data) != length:
