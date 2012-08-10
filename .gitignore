@@ -20,3 +20,10 @@ bin
 .buildout
 cover
 
+# ingnore generated doc stuff
+docs/_build
+docs/_templates
+docs/_static
+docs/Makefile
+docs/make.bat
+
