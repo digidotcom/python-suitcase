@@ -1,24 +1,32 @@
-
 # Editor Files
 *~
 \#*\#
-
-# Eclipse Files
+.idea
 .*project*
 
 # Python
-*.pyc
-*.pyo
+*.py[cod]
 
 # Setuptools
 dist
 MANIFEST
 *egg-info*
+README.rst
+
+# Coverage
+.coverage
+cover/
 
 # Buildout
 bin
 .buildout
 cover
+
+# Tox/Virtualenv
+env
+env2
+env3
+.tox
 
 # ingnore generated doc stuff
 docs/_build
