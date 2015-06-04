@@ -1,12 +1,44 @@
-from distutils.core import setup
-from setuptools import find_packages
+import os
+from setuptools import setup, find_packages
+
+
+def get_long_description():
+    long_description = open('README.md').read()
+    try:
+        import subprocess
+        import pandoc
+
+        process = subprocess.Popen(
+            ['which pandoc'],
+            shell=True,
+            stdout=subprocess.PIPE,
+            universal_newlines=True)
+
+        pandoc_path = process.communicate()[0]
+        pandoc_path = pandoc_path.strip('\n')
+
+        pandoc.core.PANDOC_PATH = pandoc_path
+
+        doc = pandoc.Document()
+        doc.markdown = long_description
+        long_description = doc.rst
+        open("README.rst", "w").write(doc.rst)
+    except:
+        if os.path.exists("README.rst"):
+            long_description = open("README.rst").read()
+        else:
+            print("Could not find pandoc or convert properly")
+            print("  make sure you have pandoc (system) and pyandoc (python module) installed")
+
+    return long_description
+
 
 setup(
-  name='pacman',
-  version='0.5.5',
-  description='A library for specifying/parsing binary protocols',
-  long_description=open('README.txt').read(),
-  author="Paul Osborne",
-  author_email="paul.osborne@spectrumdsi.com",
-  packages=find_packages(),
+    name='pacman',
+    version='0.6',
+    description='A library for specifying/parsing/packing binary protocols',
+    long_description=get_long_description(),
+    author="Paul Osborne",
+    author_email="paul.osborne@digi.com",
+    packages=find_packages(),
 )
