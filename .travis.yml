@@ -1,0 +1,21 @@
+language: python
+
+# this version of python is only used to run tox - the version specified by TOX_ENV
+# is used to install and run tests
+python: 2.7
+env:
+  - TOX_ENV=py27
+  - TOX_ENV=py32
+  - TOX_ENV=py33
+  - TOX_ENV=py34
+  - TOX_ENV=pypy
+  - TOX_ENV=coverage
+
+# command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
+install:
+  - pip install tox
+  - pip install -r dev-requirements.txt
+
+# command to run tests, e.g. python setup.py test
+script:
+  - tox -e $TOX_ENV
