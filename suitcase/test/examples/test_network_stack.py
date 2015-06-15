@@ -8,11 +8,11 @@
 from suitcase.fields import UBInt16, VariableRawPayload, LengthField, Magic, \
     UBInt8Sequence, DispatchField, DispatchTarget, UBInt8, UBInt32, BitField, BitNum, \
     BitBool
-from suitcase.message import BaseMessage
+from suitcase.structure import Structure
 import unittest
 
 
-class TCPFrameHeader(BaseMessage):
+class TCPFrameHeader(Structure):
     source_address = UBInt16()
     destination_address = UBInt16()
     sequence_number = UBInt32()
@@ -36,7 +36,7 @@ class TCPFrameHeader(BaseMessage):
     # TODO: additional options if data_offset > 5
 
 
-class UDPFrame(BaseMessage):
+class UDPFrame(Structure):
     source_port = UBInt16()
     destination_port = UBInt16()
     length = LengthField(UBInt16())
@@ -44,7 +44,7 @@ class UDPFrame(BaseMessage):
     data = VariableRawPayload(length)
 
 
-class IPV4Frame(BaseMessage):
+class IPV4Frame(Structure):
     options = BitField(64,
         version=BitNum(4),
         internet_header_length=BitNum(4),
@@ -69,7 +69,7 @@ class IPV4Frame(BaseMessage):
 # 
 # For instance, we don't allow for the option 802.1q vlan tagging
 # which could come after mac_source
-class EthernetFrame(BaseMessage):
+class EthernetFrame(Structure):
     preamble_sof = Magic('\xAA' * 8)  # 8 bytes of 10101010
     mac_dest = UBInt8Sequence(6)
     mac_source = UBInt8Sequence(6)

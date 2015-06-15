@@ -6,18 +6,18 @@
 
 from StringIO import StringIO
 from suitcase.crc import crc16_ccitt
-from suitcase.exceptions import PacmanProgrammingError
+from suitcase.exceptions import SuitcaseProgrammingError
 from suitcase.fields import DependentField, LengthField, VariableRawPayload, \
     Magic, BitField, BitBool, BitNum, UBInt8, UBInt16, UBInt24, UBInt32, UBInt64, \
     SBInt8, SBInt16, SBInt32, SBInt64, ULInt8, ULInt16, ULInt32, ULInt64, SLInt8, \
     SLInt16, SLInt32, SLInt64, ConditionalField, UBInt8Sequence, SBInt8Sequence, \
     FieldProperty, DispatchField, DispatchTarget, CRCField, Payload
-from suitcase.message import BaseMessage
+from suitcase.structure import Structure
 import struct
 import unittest
 
 
-class SuperChild(BaseMessage):
+class SuperChild(Structure):
     options = DependentField('options')
     ubseq = DependentField('ubseq')
     length = LengthField(DependentField('submessage_length'))
@@ -26,7 +26,7 @@ class SuperChild(BaseMessage):
 
 
 # Message containing every field
-class SuperMessage(BaseMessage):
+class SuperMessage(Structure):
     magic = Magic('\xAA\xAA')
 
     # bitfield
@@ -97,7 +97,7 @@ class TestMagic(unittest.TestCase):
 
     def test_magic(self):
         magic_field = Magic('\xAA').create_instance(None)
-        self.assertRaises(PacmanProgrammingError, magic_field.setval)
+        self.assertRaises(SuitcaseProgrammingError, magic_field.setval)
 
 
 class TestSuperField(unittest.TestCase):
@@ -182,7 +182,7 @@ class TestFieldProperty(unittest.TestCase):
 
     def test_basic_setget(self):
         # define the message
-        class MyMessage(BaseMessage):
+        class MyMessage(Structure):
             _version = UBInt8Sequence(2)
             version = FieldProperty(_version,
                                     onget=lambda v: "%d.%02d" % (v[0], v[1]),
@@ -198,7 +198,7 @@ class TestFieldProperty(unittest.TestCase):
         self.assertEqual(msg.version, "22.07")
 
 
-class BasicMessage(BaseMessage):
+class BasicMessage(Structure):
     b1 = UBInt8()
     b2 = UBInt8()
 
@@ -220,11 +220,11 @@ class TestInstancePrototyping(unittest.TestCase):
 
 class TestLengthField(unittest.TestCase):
 
-    class MyMuiltipliedLengthMessage(BaseMessage):
+    class MyMuiltipliedLengthMessage(Structure):
         length = LengthField(UBInt8(), multiplier=8)
         payload = VariableRawPayload(length)
 
-    class MyLengthyMessage(BaseMessage):
+    class MyLengthyMessage(Structure):
         length = LengthField(UBInt16())
         payload = VariableRawPayload(length)
 
@@ -251,7 +251,7 @@ class TestLengthField(unittest.TestCase):
         msg = self.MyMuiltipliedLengthMessage()
         payload = '\x01'  # 1-byte is not modulo 8
         msg.payload = payload
-        self.assertRaises(PacmanProgrammingError, msg.pack)
+        self.assertRaises(SuitcaseProgrammingError, msg.pack)
 
     def test_multiplied_length_unpack(self):
         msg = self.MyMuiltipliedLengthMessage()
@@ -264,7 +264,7 @@ class TestLengthField(unittest.TestCase):
 class TestByteSequence(unittest.TestCase):
 
     def test_fixed_sequence(self):
-        class MySeqMessage(BaseMessage):
+        class MySeqMessage(Structure):
             type = UBInt8()
             byte_values = UBInt8Sequence(16)
 
@@ -277,7 +277,7 @@ class TestByteSequence(unittest.TestCase):
                          '\t\n\x0b\x0c\r\x0e\x0f')
 
     def test_variable_sequence(self):
-        class MyVarSeqMessage(BaseMessage):
+        class MyVarSeqMessage(Structure):
             type = UBInt8()
             length = LengthField(UBInt8())
             seq = UBInt8Sequence(length)
@@ -294,7 +294,7 @@ class TestByteSequence(unittest.TestCase):
         self.assertEqual(msg2.seq, (1, 2, 3, 4, 5, 6, 7, 8, 9, 10))
 
     def test_variable_sequence_nolength(self):
-        class MyVarSeqMessage(BaseMessage):
+        class MyVarSeqMessage(Structure):
             s = VariableRawPayload(None)
             b = UBInt8Sequence(None)
 
@@ -305,24 +305,24 @@ class TestByteSequence(unittest.TestCase):
                          'Hello, world - \x00\x01\x02\x03\x04\x05')
 
 
-class MyTargetMessage(BaseMessage):
+class MyTargetMessage(Structure):
     # inherited from the parent message
     _length = LengthField(DependentField('length'))
     payload = VariableRawPayload(_length)
 
 
-class MyOtherTargetMessage(BaseMessage):
+class MyOtherTargetMessage(Structure):
     #: Inherited from the parent message
     _length = LengthField(DependentField('length'))
     sequence = UBInt8Sequence(_length)
 
 
-class MyDefaultTargetMessage(BaseMessage):
+class MyDefaultTargetMessage(Structure):
     _length = LengthField(DependentField('length'))
     sequence = UBInt8Sequence(_length)
 
 
-class MyBasicDispatchMessage(BaseMessage):
+class MyBasicDispatchMessage(Structure):
     type = DispatchField(UBInt8())
     length = LengthField(UBInt16())
     body = DispatchTarget(length, type, {
@@ -332,13 +332,13 @@ class MyBasicDispatchMessage(BaseMessage):
     })
 
 
-class BasicGreedy(BaseMessage):
+class BasicGreedy(Structure):
     a = UBInt8()
     b = UBInt8()
     payload = Payload()
 
 
-class BoxedGreedy(BaseMessage):
+class BoxedGreedy(Structure):
     a = LengthField(UBInt8())
     b = UBInt8()
     payload = Payload()
@@ -410,7 +410,7 @@ class TestMessageDispatching(unittest.TestCase):
 
     def test_foreign_type(self):
         msg = MyBasicDispatchMessage()
-        self.assertRaises(PacmanProgrammingError,
+        self.assertRaises(SuitcaseProgrammingError,
                           setattr, msg, 'body', SuperMessage())
 
     def test_default_dispatch(self):
@@ -447,7 +447,7 @@ class TestBitFields(unittest.TestCase):
     def test_bad_operations(self):
         field_proto = BitField(7,
             num=BitNum(7))
-        self.assertRaises(PacmanProgrammingError,
+        self.assertRaises(SuitcaseProgrammingError,
                           field_proto.create_instance, None)
 
     def test_explicit_field_override(self):
@@ -473,7 +473,7 @@ class TestBitFields(unittest.TestCase):
 
 
 # message where f2 is only defined if f2 is 255
-class Conditional(BaseMessage):
+class Conditional(Structure):
     f1 = UBInt8()
     f2 = ConditionalField(UBInt8(), lambda m: m.f1 == 255)
 

@@ -4,42 +4,41 @@
 #
 # Copyright (c) 2015 Digi International Inc. All Rights Reserved.
 
-"""Define an exception hierarchy used within Pacman
+"""Define an exception hierarchy used within Suitcase
 
-The basic rule is that users of the Pacman library should always
-be able to catch the base ``PacmanException`` and be confident
+The basic rule is that users of the Suitcase library should always
+be able to catch the base :class:`.SuitcaseException` and be confident
 that they will not get some other random exception.  Catching
 more specific subclasses of this exception should then be possible.
 
 There are still some cases (especially when constructing a field) that
 base exceptions (like TypeError, ValueError, or TypeError) might still be
 raised.  In general, however, any case where things are dynamic, we do
-our best to raise a ``PacmanException`` with meaningful information.
-
+our best to raise a :class:`.SuitcaseException` with meaningful information.
 """
 
 
-class PacmanException(Exception):
+class SuitcaseException(Exception):
     """Base exception acting as the root for other exceptions"""
 
 
-class PacmanChecksumException(PacmanException):
+class SuitcaseChecksumException(SuitcaseException):
     """Exception raised when a checksum does not match"""
 
 
-class PacmanProgrammingError(PacmanException):
+class SuitcaseProgrammingError(SuitcaseException):
     """Exception raised when somebody is doing something wrong"""
 
 
-class PacmanParseError(PacmanException):
+class SuitcaseParseError(SuitcaseException):
     """Raised when there is a problem parsing bytes into a suitcase schema"""
 
 
-class PacmanPackException(PacmanException):
+class SuitcasePackException(SuitcaseException):
     """Raised when there is an error packing a message"""
 
 
-class PacmanPackStructException(PacmanPackException):
+class SuitcasePackStructException(SuitcasePackException):
     """Raised on an error packing a struct field"""
 
     def __init__(self, struct_exception):

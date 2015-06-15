@@ -1,11 +1,11 @@
-Pacman
-======
+Suitcase
+========
 
-Pacman is a library providing a set of primitives and helpers for
-specifying and parsing protocols.  Pacman provides an internal DSL
+Suitcase is a library providing a set of primitives and helpers for
+specifying and parsing protocols.  Suitcase provides an internal DSL
 (Domain Specific Language) for describing protocol frames.  It seeks
 to do for binary protocols what things like
-[Djangodjan's ORM](https://docs.djangoproject.com/en/1.8/topics/db/models/)
+[Django's ORM](https://docs.djangoproject.com/en/1.8/topics/db/models/)
 and
 [Sqlalchemy's Declarative Syntax](http://docs.sqlalchemy.org/en/latest/orm/tutorial.html#declare-a-mapping)
 do for Database ORMs and adopts a similar, class-based syntax.
@@ -13,17 +13,17 @@ do for Database ORMs and adopts a similar, class-based syntax.
 Example
 =======
 
-The following example shows how you would use Pacman to describe some
+The following example shows how you would use Suitcase to describe some
 of the core network protocols that form the backbone of the internet:
 
 ```python
-from pacman.fields import UBInt16, Payload, LengthField, Magic, \
+from suitcase.fields import UBInt16, Payload, LengthField, Magic, \
     UBInt8Sequence, DispatchField, DispatchTarget, UBInt8, UBInt32, BitField, BitNum, \
     BitBool
-from pacman.message import BaseMessage
+from suitcase.struct import Structure
 
 
-class TCPFrameHeader(BaseMessage):
+class TCPFrameHeader(Structure):
     source_address = UBInt16()
     destination_address = UBInt16()
     sequence_number = UBInt32()
@@ -47,7 +47,7 @@ class TCPFrameHeader(BaseMessage):
     # TODO: additional options if data_offset > 5
 
 
-class UDPFrame(BaseMessage):
+class UDPFrame(Structure):
     source_port = UBInt16()
     destination_port = UBInt16()
     length = LengthField(UBInt16())
@@ -55,7 +55,7 @@ class UDPFrame(BaseMessage):
     data = Payload(length)
 
 
-class IPV4Frame(BaseMessage):
+class IPV4Frame(Structure):
     options = BitField(64,
         version=BitNum(4),
         internet_header_length=BitNum(4),

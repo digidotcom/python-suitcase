@@ -45,10 +45,10 @@ class StreamProtocolHandler(object):
 
         from suitcase.protocol import StreamProtocolHandler
         from suitcase.fields import LengthField, UBInt16, VariableRawPayload
-        from suitcase.message import BaseMessage
+        from suitcase.struct import Structure
         import socket
 
-        class SimpleFramedMessage(BaseMessage):
+        class SimpleFramedMessage(Structure):
             length = LengthField(UBInt16())
             payload = VariableRawPayload(length)
 

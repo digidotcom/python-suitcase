@@ -6,18 +6,18 @@
 
 from suitcase.fields import Magic, SBInt64, DispatchField, UBInt8, DispatchTarget, \
     LengthField
-from suitcase.message import BaseMessage
+from suitcase.structure import Structure
 from suitcase.protocol import StreamProtocolHandler
 from suitcase.test.examples.test_network_stack import UDPFrame
 import unittest
 
 
-class MagicSchema(BaseMessage):
+class MagicSchema(Structure):
     magic = Magic('\xAA\xAA')
     value = SBInt64()
 
 
-class ErrorCaseSchema(BaseMessage):
+class ErrorCaseSchema(Structure):
     type = DispatchField(UBInt8())
     length = LengthField(UBInt8())
     body = DispatchTarget(length, type, {

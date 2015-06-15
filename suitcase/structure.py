@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2015 Digi International Inc. All Rights Reserved.
 
-from suitcase.exceptions import PacmanChecksumException, PacmanException, \
-    PacmanPackException, PacmanParseError
+from suitcase.exceptions import SuitcaseChecksumException, SuitcaseException, \
+    SuitcasePackException, SuitcaseParseError
 from suitcase.fields import FieldPlaceholder, CRCField
 import sys
 try:
@@ -41,13 +41,13 @@ class Packer(object):
                     crc_fields.append((field, crc_offset))
                 else:
                     field.pack(stream)
-            except PacmanException:
+            except SuitcaseException:
                 raise  # just reraise the same exception object
             except Exception:
                 # keep the original traceback information, see
                 # http://stackoverflow.com/questions/3847503/wrapping-exceptions-in-python
                 trace = sys.exc_info()[2]
-                raise PacmanPackException("Unexpected exception during pack "
+                raise SuitcasePackException("Unexpected exception during pack "
                                           "of %r" % name), None, trace
 
         # if there is a crc value, seek back to the field and
@@ -94,18 +94,18 @@ class Packer(object):
             else:
                 data = stream.read(length)
                 if len(data) != length:
-                    raise PacmanParseError("While attempting to parse field "
+                    raise SuitcaseParseError("While attempting to parse field "
                                            "%r we tried to read %s bytes but "
                                            "we were only able to read %s." %
                                            (name, length, len(data)))
 
             try:
                 field.unpack(data)
-            except PacmanException:
+            except SuitcaseException:
                 raise  # just re-raise these
             except Exception:
                 trace = sys.exc_info()[2]
-                raise PacmanParseError("Unexpected exception while unpacking "
+                raise SuitcaseParseError("Unexpected exception while unpacking "
                                        "field %r" % name), None, trace
 
         if greedy_field is not None:
@@ -122,17 +122,17 @@ class Packer(object):
                 length = field.bytes_required
                 data = inverted_stream.read(length)[::-1]
                 if len(data) != length:
-                    raise PacmanParseError("While attempting to parse field "
+                    raise SuitcaseParseError("While attempting to parse field "
                                            "%r we tried to read %s bytes but "
                                            "we were only able to read %s." %
                                            (name, length, len(data)))
                 try:
                     field.unpack(data)
-                except PacmanException:
+                except SuitcaseException:
                     raise  # just re-raise these
                 except Exception:
                     trace = sys.exc_info()[2]
-                    raise PacmanParseError("Unexpected exception while "
+                    raise SuitcaseParseError("Unexpected exception while "
                                            "unpacking field "
                                            "%r" % name), None, trace
 
@@ -174,10 +174,10 @@ class MessageMeta(type):
         return type.__new__(cls, name, bases, dct)
 
 
-class BaseMessage(object):
+class Structure(object):
     r"""Base class for message schema declaration
 
-    ``BaseMessage`` forms the core of the Pacman library and allows for
+    ``Structure`` forms the core of the Suitcase library and allows for
     a declarative syntax for specifying packet schemas and associated
     methods for transforming these schemas into packed bytes (and vice-versa).
 
@@ -185,7 +185,7 @@ class BaseMessage(object):
     Datagram::
 
 
-        class UDPDatagram(BaseMessage):
+        class UDPDatagram(Structure):
             source_port = UBInt16()
             destination_port = UBInt16()
             length = LengthField(UBInt16())

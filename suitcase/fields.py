@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2015 Digi International Inc. All Rights Reserved.
 
-from suitcase.exceptions import PacmanChecksumException, PacmanProgrammingError, \
-    PacmanParseError, PacmanException, PacmanPackStructException
+from suitcase.exceptions import SuitcaseChecksumException, SuitcaseProgrammingError, \
+    SuitcaseParseError, SuitcaseException, SuitcasePackStructException
 import struct
 try:
     from cStringIO import StringIO
@@ -61,7 +61,7 @@ class BaseField(object):
     are in place (having a parent).
 
     :param instantiate: Create an actual instance instead of a placeholder
-    :param parent: Specify the parent of this field (typically a BaseMessage
+    :param parent: Specify the parent of this field (typically a Structure
         instace).
 
     """
@@ -115,7 +115,7 @@ class CRCField(BaseField):
 
     A quick example of a message with a checksum is in order::
 
-        class MyChecksummedMessage(BaseMessage):
+        class MyChecksummedMessage(Structure):
             soh = Magic('\x1f\x1f')
             message_id = UBInt16()
             sequence_number = UBInt8()
@@ -151,7 +151,7 @@ class CRCField(BaseField):
                         data[offset+self.bytes_required:])) 
         actual_checksum = self.algo(data[self.start:self.end])
         if (recorded_checksum != actual_checksum):
-            raise PacmanChecksumException(
+            raise SuitcaseChecksumException(
                 "recorded checksum %r did not match actual %r.  full data: %r",
                 recorded_checksum, actual_checksum, data)
 
@@ -166,7 +166,7 @@ class CRCField(BaseField):
         return self.field.getval()
 
     def setval(self):
-        raise PacmanProgrammingError("CRC will be set automatically")
+        raise SuitcaseProgrammingError("CRC will be set automatically")
 
     def pack(self, stream):
         # write placeholder during the first pass
@@ -188,14 +188,14 @@ class Magic(BaseField):
         return self.expected_sequence
 
     def setval(self):
-        raise PacmanProgrammingError("One does not simply modify Magic")
+        raise SuitcaseProgrammingError("One does not simply modify Magic")
 
     def pack(self, stream):
         stream.write(self.expected_sequence)
 
     def unpack(self, data):
         if not data == self.expected_sequence:
-            raise PacmanParseError(
+            raise SuitcaseParseError(
                 "Expected sequence %r for magic field but got %r on "
                 "message %r" % (self.expected_sequence, data, self._parent))
 
@@ -211,7 +211,7 @@ class FieldProperty(BaseField):
     within a message.  Take the test case as an example::
 
         # define the message
-        class MyMessage(BaseMessage):
+        class MyMessage(Structure):
             _version = UBByteSequence(2)
             version = FieldProperty(_version,
                                     onget=lambda v: "%d.%02d" % (v[0], v[1]),
@@ -282,7 +282,7 @@ class DispatchField(BaseField):
 
     Example::
 
-        class MyMessage(BaseMessage):
+        class MyMessage(Structure):
             type = DispatchField(UBInt8())
             body = DispatchTarget(dispatch_field = type, dispatch_mapping={
                 0x00: MessageType0,
@@ -324,7 +324,7 @@ class DispatchTarget(BaseField):
 
     Example::
 
-        class MyMessage(BaseMessage):
+        class MyMessage(Structure):
             type = DispatchField(UBInt8())
             body = DispatchTarget(dispatch_field = type, dispatch_mapping={
                 0x00: MessageType0,
@@ -372,7 +372,7 @@ class DispatchTarget(BaseField):
             vtype = type(value)
             key = self.inverse_dispatch_mapping[vtype]
         except KeyError:
-            raise PacmanProgrammingError("The type specified is not in the "
+            raise SuitcaseProgrammingError("The type specified is not in the "
                                          "dispatch table")
 
         # OK, things check out.  Set both the value here and the
@@ -391,7 +391,7 @@ class DispatchTarget(BaseField):
         if target_msg_type is None:
             target_msg_type = self.dispatch_mapping.get(None)
         if target_msg_type is None:  # still none
-            raise PacmanParseError("Input data contains type byte not"
+            raise SuitcaseParseError("Input data contains type byte not"
                                    " contained in mapping")
         message_instance = target_msg_type()
         self.setval(message_instance)
@@ -433,7 +433,7 @@ class LengthField(BaseField):
         return length_value
 
     def setval(self, value):
-        raise PacmanProgrammingError("Cannot set the value of a LengthField")
+        raise SuitcaseProgrammingError("Cannot set the value of a LengthField")
 
     def _associate_length_consumer(self, target_field):
         def _length_value_provider():
@@ -441,14 +441,14 @@ class LengthField(BaseField):
             target_field.pack(sio)
             target_field_length = len(sio.getvalue())
             if not target_field_length % self.multiplier == 0:
-                raise PacmanProgrammingError("Payload length not divisible "
+                raise SuitcaseProgrammingError("Payload length not divisible "
                                              "by %s" % self.multiplier)
             return (target_field_length / self.multiplier)
         self.length_value_provider = _length_value_provider
 
     def pack(self, stream):
         if self.length_value_provider is None:
-            raise PacmanException("No length_provider added to this LengthField")
+            raise SuitcaseException("No length_provider added to this LengthField")
         self.length_field._value = self.length_value_provider()
         self.length_field.pack(stream)
 
@@ -580,7 +580,7 @@ class BaseVariableByteSequence(BaseField):
         try:
             stream.write(struct.pack(sfmt, *self._value))
         except struct.error, e:
-            raise PacmanPackStructException(e)
+            raise SuitcasePackStructException(e)
 
     def unpack(self, data):
         assert len(data) == self.bytes_required
@@ -590,7 +590,7 @@ class BaseVariableByteSequence(BaseField):
         try:
             self._value = struct.unpack(sfmt, data)
         except struct.error, e:
-            raise PacmanPackStructException(e)
+            raise SuitcasePackStructException(e)
 
 
 class DependentField(BaseField):
@@ -605,11 +605,11 @@ class DependentField(BaseField):
     I wanted to include in some logic handling packets at some higher
     layer.  I could include that byte in my message as follows::
 
-        class MyDependentMessage(BaseMessage):
+        class MyDependentMessage(Structure):
             ll_options = DependentField('proto_options')
             data = UBInt8Sequence(16)
 
-        class LowerLevelProtocol(BaseMessage):
+        class LowerLevelProtocol(Structure):
             type = DispatchField(UBInt16())
             proto_options = UBInt8()
             body = DispatchTarget(None, type, {
@@ -906,13 +906,14 @@ class BitField(BaseField):
 
     Bit segments may be any BitFieldField instance, with the two most
     commonly used fields being:
-     * BitBool(): A single bit flag that is either True or False
-     * BitNum(bits): A multi-bit field treated like a big-endian integral
+
+    * BitBool(): A single bit flag that is either True or False
+    * BitNum(bits): A multi-bit field treated like a big-endian integral
            value.
 
     Example Usage::
 
-        class TCPFrameHeader(BaseMessage):
+        class TCPFrameHeader(Structure):
             source_address = UBInt16()
             destination_address = UBInt16()
             sequence_number = UBInt32()
@@ -949,7 +950,7 @@ class BitField(BaseField):
         self._ordered_bitfields = []
         self._bitfield_map = {}
         if number_bits % 8 != 0:
-            raise PacmanProgrammingError("Number of bits must be a factor of "
+            raise SuitcaseProgrammingError("Number of bits must be a factor of "
                                          "8, was %d" % number_bits)
 
         self.number_bits = number_bits
@@ -998,7 +999,7 @@ class BitField(BaseField):
         return self
 
     def setval(self, value):
-        raise PacmanProgrammingError("Setting the value of a bitfield "
+        raise SuitcaseProgrammingError("Setting the value of a bitfield "
                                      "directly is prohibited")
 
     def pack(self, stream):
