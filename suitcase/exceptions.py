@@ -32,7 +32,7 @@ class PacmanProgrammingError(PacmanException):
 
 
 class PacmanParseError(PacmanException):
-    """Raised when there is a problem parsing bytes into a pacman schema"""
+    """Raised when there is a problem parsing bytes into a suitcase schema"""
 
 
 class PacmanPackException(PacmanException):

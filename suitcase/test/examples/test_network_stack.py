@@ -4,11 +4,11 @@
 #
 # Copyright (c) 2015 Digi International Inc. All Rights Reserved.
 
-"""Example of UDP protocol datagram parsing with pacman"""
-from pacman.fields import UBInt16, VariableRawPayload, LengthField, Magic, \
+"""Example of UDP protocol datagram parsing with suitcase"""
+from suitcase.fields import UBInt16, VariableRawPayload, LengthField, Magic, \
     UBInt8Sequence, DispatchField, DispatchTarget, UBInt8, UBInt32, BitField, BitNum, \
     BitBool
-from pacman.message import BaseMessage
+from suitcase.message import BaseMessage
 import unittest
 
 

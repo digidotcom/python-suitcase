@@ -4,11 +4,11 @@
 #
 # Copyright (c) 2015 Digi International Inc. All Rights Reserved.
 
-from pacman.fields import Magic, SBInt64, DispatchField, UBInt8, DispatchTarget, \
+from suitcase.fields import Magic, SBInt64, DispatchField, UBInt8, DispatchTarget, \
     LengthField
-from pacman.message import BaseMessage
-from pacman.protocol import StreamProtocolHandler
-from pacman.test.examples.test_network_stack import UDPFrame
+from suitcase.message import BaseMessage
+from suitcase.protocol import StreamProtocolHandler
+from suitcase.test.examples.test_network_stack import UDPFrame
 import unittest
 
 

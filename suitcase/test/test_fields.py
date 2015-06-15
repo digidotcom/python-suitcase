@@ -5,14 +5,14 @@
 # Copyright (c) 2015 Digi International Inc. All Rights Reserved.
 
 from StringIO import StringIO
-from pacman.crc import crc16_ccitt
-from pacman.exceptions import PacmanProgrammingError
-from pacman.fields import DependentField, LengthField, VariableRawPayload, \
+from suitcase.crc import crc16_ccitt
+from suitcase.exceptions import PacmanProgrammingError
+from suitcase.fields import DependentField, LengthField, VariableRawPayload, \
     Magic, BitField, BitBool, BitNum, UBInt8, UBInt16, UBInt24, UBInt32, UBInt64, \
     SBInt8, SBInt16, SBInt32, SBInt64, ULInt8, ULInt16, ULInt32, ULInt64, SLInt8, \
     SLInt16, SLInt32, SLInt64, ConditionalField, UBInt8Sequence, SBInt8Sequence, \
     FieldProperty, DispatchField, DispatchTarget, CRCField, Payload
-from pacman.message import BaseMessage
+from suitcase.message import BaseMessage
 import struct
 import unittest
 

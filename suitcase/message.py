@@ -4,9 +4,9 @@
 #
 # Copyright (c) 2015 Digi International Inc. All Rights Reserved.
 
-from pacman.exceptions import PacmanChecksumException, PacmanException, \
+from suitcase.exceptions import PacmanChecksumException, PacmanException, \
     PacmanPackException, PacmanParseError
-from pacman.fields import FieldPlaceholder, CRCField
+from suitcase.fields import FieldPlaceholder, CRCField
 import sys
 try:
     from cStringIO import StringIO

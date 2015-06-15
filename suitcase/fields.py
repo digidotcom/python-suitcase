@@ -4,7 +4,7 @@
 #
 # Copyright (c) 2015 Digi International Inc. All Rights Reserved.
 
-from pacman.exceptions import PacmanChecksumException, PacmanProgrammingError, \
+from suitcase.exceptions import PacmanChecksumException, PacmanProgrammingError, \
     PacmanParseError, PacmanException, PacmanPackStructException
 import struct
 try:
@@ -105,7 +105,7 @@ class CRCField(BaseField):
     :param algo: The algorithm to be used for performing the checksum.
        This is basically a function that takes a chunk of data and
        gives the checksum.  Several of these are provided out of the
-       box in ``pacman.crc``.
+       box in ``suitcase.crc``.
     :param start: The offset in the overall message at which we should
         start the checksum.  This may be positive (from the start) or
         negative (from the end of the message).

@@ -39,7 +39,7 @@ def get_long_description():
 
 
 setup(
-    name='pacman',
+    name='suitcase',
     version='0.6',
     description='A library for specifying/parsing/packing binary protocols',
     long_description=get_long_description(),

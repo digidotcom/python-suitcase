@@ -13,7 +13,7 @@ handlers will also provide notifications of error conditions
 (for instance, unexpected bytes or a bad checksum)
 
 """
-from pacman.fields import Magic
+from suitcase.fields import Magic
 try:
     from cStringIO import StringIO
 except ImportError:
@@ -43,9 +43,9 @@ class StreamProtocolHandler(object):
     appraoch for parsing a simple tcp protocol::
 
 
-        from pacman.protocol import StreamProtocolHandler
-        from pacman.fields import LengthField, UBInt16, VariableRawPayload
-        from pacman.message import BaseMessage
+        from suitcase.protocol import StreamProtocolHandler
+        from suitcase.fields import LengthField, UBInt16, VariableRawPayload
+        from suitcase.message import BaseMessage
         import socket
 
         class SimpleFramedMessage(BaseMessage):

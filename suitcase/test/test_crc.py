@@ -4,7 +4,7 @@
 #
 # Copyright (c) 2015 Digi International Inc. All Rights Reserved.
 
-from pacman.crc import crc16_ccitt, crc32
+from suitcase.crc import crc16_ccitt, crc32
 import unittest
 
 
