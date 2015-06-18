@@ -210,8 +210,6 @@ class Structure(object):
 
     """
 
-    __metaclass__ = StructureMeta
-
     @classmethod
     def from_data(cls, data):
         """Create a new, populated message from some data
