@@ -4,6 +4,8 @@
 #
 # Copyright (c) 2015 Digi International Inc. All Rights Reserved.
 
+import unittest
+
 import six
 from suitcase.crc import crc16_ccitt
 from suitcase.exceptions import SuitcaseProgrammingError
@@ -14,7 +16,6 @@ from suitcase.fields import DependentField, LengthField, VariableRawPayload, \
     FieldProperty, DispatchField, DispatchTarget, CRCField, Payload
 from suitcase.structure import Structure
 import struct
-import unittest
 
 
 class SuperChild(Structure):
@@ -169,7 +170,7 @@ class TestSuperField(unittest.TestCase):
                 sm1_value = getattr(sm, key)
                 self.assertEqual(sm2_value, sm1_value,
                                  "%s: %s != %s, types(%s, %s)" % (
-                                 key, sm2_value, sm1_value, type(sm2_value), type(sm1_value)))
+                                     key, sm2_value, sm1_value, type(sm2_value), type(sm1_value)))
 
     def test_repr_works(self):
         # just make sure nothing creashes

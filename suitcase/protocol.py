@@ -15,6 +15,7 @@ handlers will also provide notifications of error conditions
 """
 import six
 from suitcase.fields import Magic
+
 try:
     from functools import partial
 except ImportError:
@@ -23,6 +24,7 @@ except ImportError:
             newkeywords = kwargs.copy()
             newkeywords.update(fkeywords)
             return func(*(args + fargs), **newkeywords)
+
         newfunc.func = func
         newfunc.args = args
         newfunc.keywords = kwargs

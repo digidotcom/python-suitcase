@@ -5,12 +5,13 @@
 # Copyright (c) 2015 Digi International Inc. All Rights Reserved.
 
 """Example of UDP protocol datagram parsing with suitcase"""
+import unittest
+
 import six
 from suitcase.fields import UBInt16, VariableRawPayload, LengthField, Magic, \
     UBInt8Sequence, DispatchField, DispatchTarget, UBInt8, UBInt32, BitField, BitNum, \
     BitBool
 from suitcase.structure import Structure
-import unittest
 
 
 class TCPFrameHeader(Structure):
@@ -64,7 +65,7 @@ class IPV4Frame(Structure):
 
 
 # This may not be fully accurate for ethernet as this is usually at
-# a level well below anything Pacman was designed to handle and there
+# a level well below anything Suitcase was designed to handle and there
 # are some cases that we just don't handle (like a field being either
 # a length of a type byte).
 # 

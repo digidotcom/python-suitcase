@@ -3,14 +3,14 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #
 # Copyright (c) 2015 Digi International Inc. All Rights Reserved.
-import six
+import unittest
 
+import six
 from suitcase.fields import Magic, SBInt64, DispatchField, UBInt8, DispatchTarget, \
     LengthField
 from suitcase.structure import Structure
 from suitcase.protocol import StreamProtocolHandler
 from suitcase.test.examples.test_network_stack import UDPFrame
-import unittest
 
 
 class MagicSchema(Structure):
@@ -27,7 +27,6 @@ class ErrorCaseSchema(Structure):
 
 
 class TestStreamProtocol(unittest.TestCase):
-
     def test_protocol_basic(self):
         packets_received = []
 
@@ -48,7 +47,7 @@ class TestStreamProtocol(unittest.TestCase):
             rem_bytes = rem_bytes[5:]
             phandler.feed(chunk)
 
-        assert(len(packets_received) == 1)
+        assert (len(packets_received) == 1)
         rx = packets_received[0]
         assert rx.data == b"Hello, world"
         assert rx.checksum == 0x01
@@ -117,6 +116,7 @@ class TestStreamProtocol(unittest.TestCase):
             protocol_handler.feed(six.b(chr(b)))
         self.assertEqual(len(rx), 1)
         self.assertEqual(rx[0].value, -29939)
+
 
 if __name__ == '__main__':
     unittest.main()

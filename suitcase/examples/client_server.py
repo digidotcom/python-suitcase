@@ -3,14 +3,13 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #
 # Copyright (c) 2015 Digi International Inc. All Rights Reserved.
-import SocketServer
 import sys
 import socket
-from suitcase.protocol import StreamProtocolHandler
 
+import SocketServer
+from suitcase.protocol import StreamProtocolHandler
 from suitcase.structure import Structure
 from suitcase.fields import UBInt16, LengthField, Payload, UBInt8
-
 
 FRAME_TYPE_ECHO_REQUEST = 0x00
 FRAME_TYPE_ECHO_RESPONSE = 0x10
@@ -23,7 +22,6 @@ class EchoProtocolFrame(Structure):
 
 
 class EchoTCPHandler(SocketServer.BaseRequestHandler):
-
     def _frame_received(self, request_frame):
         # frame is an instance of EchoProtocolFrame
         print("Received %r" % request_frame)
@@ -45,7 +43,7 @@ class EchoTCPHandler(SocketServer.BaseRequestHandler):
 
 def client():
     def message_received(frame):
-        print frame
+        print(frame)
 
     s = socket.socket()
     s.connect(('127.0.0.1', 7070))
@@ -61,11 +59,10 @@ def client():
         proto_handler.feed(s.recv(1024))
 
 
-
 if __name__ == '__main__':
     if len(sys.argv) != 2:
-        print "Usage Client: %s -c" % sys.argv[0]
-        print "Usage Server: %s -s" % sys.argv[1]
+        print("Usage Client: %s -c" % sys.argv[0])
+        print("Usage Server: %s -s" % sys.argv[1])
     if sys.argv[1] == '-c':
         client()
     elif sys.argv[1] == '-s':

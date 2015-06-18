@@ -4,19 +4,18 @@
 #
 # Copyright (c) 2015 Digi International Inc. All Rights Reserved.
 
-from suitcase.crc import crc16_ccitt, crc32
 import unittest
+
+from suitcase.crc import crc16_ccitt, crc32
 
 
 class TestCRC16CCITT(unittest.TestCase):
-
     def test_hello_world(self):
         crc = crc16_ccitt(b"Hello, world")
         self.assertEqual(crc, 0x3E99)
 
 
 class TestCRC32(unittest.TestCase):
-
     def test_hello_world(self):
         crc = crc32(b"Hello, world")
         self.assertEqual(crc, 0xE79AA9C2)

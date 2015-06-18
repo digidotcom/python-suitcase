@@ -141,9 +141,9 @@ class CRCField(BaseField):
         return self.field.bytes_required
 
     def validate(self, data, offset):
-        """Raises PacmanChecksumException if not valid"""
+        """Raises :class:`SuitcaseChecksumException` if not valid"""
         recorded_checksum = self.field.getval()
-        
+
         # replace checksum region with zero
         data = b''.join((data[:offset],
                          b"\x00" * self.bytes_required,
@@ -372,7 +372,7 @@ class DispatchTarget(BaseField):
             key = self.inverse_dispatch_mapping[vtype]
         except KeyError:
             raise SuitcaseProgrammingError("The type specified is not in the "
-                                         "dispatch table")
+                                           "dispatch table")
 
         # OK, things check out.  Set both the value here and the
         # type byte value
@@ -391,7 +391,7 @@ class DispatchTarget(BaseField):
             target_msg_type = self.dispatch_mapping.get(None)
         if target_msg_type is None:  # still none
             raise SuitcaseParseError("Input data contains type byte not"
-                                   " contained in mapping")
+                                     " contained in mapping")
         message_instance = target_msg_type()
         self.setval(message_instance)
         self._value.unpack(data)
@@ -441,8 +441,9 @@ class LengthField(BaseField):
             target_field_length = len(sio.getvalue())
             if not target_field_length % self.multiplier == 0:
                 raise SuitcaseProgrammingError("Payload length not divisible "
-                                             "by %s" % self.multiplier)
+                                               "by %s" % self.multiplier)
             return (target_field_length // self.multiplier)
+
         self.length_value_provider = _length_value_provider
 
     def pack(self, stream):
@@ -547,7 +548,7 @@ class Payload(BaseField):
     @property
     def bytes_required(self):
         if self.length_provider is None:
-            return  None
+            return None
         else:
             return self.length_provider.get_adjusted_length()
 
@@ -562,7 +563,6 @@ VariableRawPayload = Payload
 
 
 class BaseVariableByteSequence(BaseField):
-
     def __init__(self, make_format, length_provider, **kwargs):
         BaseField.__init__(self, **kwargs)
         self.make_format = make_format
@@ -630,7 +630,7 @@ class DependentField(BaseField):
         if self.parent_field is None:
             message_parent = self._parent._parent
             target_field = message_parent.lookup_field_by_name(
-                                self.parent_field_name)
+                self.parent_field_name)
             self.parent_field = target_field
         return self.parent_field
 
@@ -671,6 +671,7 @@ def byte_sequence_factory_factory(make_format):
             return BaseFixedByteSequence(make_format, length_or_provider)
         else:
             return BaseVariableByteSequence(make_format, length_or_provider)
+
     return byte_sequence_factory
 
 
@@ -717,9 +718,9 @@ class BaseStructField(BaseField):
         self._value = value
 
 
-#==============================================================================
+# ==============================================================================
 # Unsigned Big Endian
-#==============================================================================
+# ==============================================================================
 class UBInt8(BaseStructField):
     """Unsigned Big Endian 8-bit integer field"""
     PACK_FORMAT = UNPACK_FORMAT = b">B"
@@ -747,9 +748,9 @@ class UBInt64(BaseStructField):
     PACK_FORMAT = UNPACK_FORMAT = b">Q"
 
 
-#==============================================================================
+# ==============================================================================
 # Signed Big Endian
-#==============================================================================
+# ==============================================================================
 class SBInt8(BaseStructField):
     """Signed Big Endian 8-bit integer field"""
     PACK_FORMAT = UNPACK_FORMAT = b">b"
@@ -770,9 +771,9 @@ class SBInt64(BaseStructField):
     PACK_FORMAT = UNPACK_FORMAT = b">q"
 
 
-#==============================================================================
+# ==============================================================================
 # Unsigned Little Endian
-#==============================================================================
+# ==============================================================================
 class ULInt8(BaseStructField):
     """Unsigned Little Endian 8-bit integer field"""
     PACK_FORMAT = UNPACK_FORMAT = b"<B"
@@ -793,9 +794,9 @@ class ULInt64(BaseStructField):
     PACK_FORMAT = UNPACK_FORMAT = b"<Q"
 
 
-#==============================================================================
+# ==============================================================================
 # Signed Little Endian
-#==============================================================================
+# ==============================================================================
 class SLInt8(BaseStructField):
     """Signed Little Endian 8-bit integer field"""
     PACK_FORMAT = UNPACK_FORMAT = b"<b"
@@ -816,17 +817,17 @@ class SLInt64(BaseStructField):
     PACK_FORMAT = UNPACK_FORMAT = b"<q"
 
 
-#==============================================================================
+# ==============================================================================
 # BitField and Bits
-#==============================================================================
+# ==============================================================================
 def bitfield_placeholder_factory_factory(cls):
     def _factory_fn(*args, **kwargs):
         return cls(*args, **kwargs)
+
     return _factory_fn
 
 
 class _BitFieldFieldPlaceholder(object):
-
     _global_seqno = 0
 
     def __init__(self, cls, args, kwargs):
@@ -843,7 +844,6 @@ class _BitFieldFieldPlaceholder(object):
 
 
 class _BitFieldField(object):
-
     def __init__(self, *args, **kwargs):
         pass
 
@@ -858,7 +858,6 @@ class _BitFieldField(object):
 
 
 class _BitBool(_BitFieldField):
-
     def __init__(self, **kwargs):
         _BitFieldField.__init__(self, **kwargs)
         self.size = 1
@@ -881,7 +880,6 @@ class _BitBool(_BitFieldField):
 
 
 class _BitNum(_BitFieldField):
-
     def __init__(self, size, **kwargs):
         _BitFieldField.__init__(self, **kwargs)
         self.size = size
@@ -889,10 +887,12 @@ class _BitNum(_BitFieldField):
 
     def getval(self):
         return self._value
+
     viewget = getval
 
     def setval(self, value):
         self._value = value
+
     viewset = setval
 
 
@@ -950,7 +950,7 @@ class BitField(BaseField):
         self._bitfield_map = {}
         if number_bits % 8 != 0:
             raise SuitcaseProgrammingError("Number of bits must be a factor of "
-                                         "8, was %d" % number_bits)
+                                           "8, was %d" % number_bits)
 
         self.number_bits = number_bits
         self.number_bytes = number_bits // 8
@@ -999,7 +999,7 @@ class BitField(BaseField):
 
     def setval(self, value):
         raise SuitcaseProgrammingError("Setting the value of a bitfield "
-                                     "directly is prohibited")
+                                       "directly is prohibited")
 
     def pack(self, stream):
         value = 0

@@ -92,9 +92,9 @@ class Packer(object):
                 data = stream.read(length)
                 if len(data) != length:
                     raise SuitcaseParseError("While attempting to parse field "
-                                           "%r we tried to read %s bytes but "
-                                           "we were only able to read %s." %
-                                           (name, length, len(data)))
+                                             "%r we tried to read %s bytes but "
+                                             "we were only able to read %s." %
+                                             (name, length, len(data)))
 
             try:
                 field.unpack(data)
@@ -114,14 +114,14 @@ class Packer(object):
             for _name, field in reversed_remaining_fields:
                 if isinstance(field, CRCField):
                     crc_fields.append(
-                    (field, -inverted_stream.tell() - field.bytes_required))
+                        (field, -inverted_stream.tell() - field.bytes_required))
                 length = field.bytes_required
                 data = inverted_stream.read(length)[::-1]
                 if len(data) != length:
                     raise SuitcaseParseError("While attempting to parse field "
-                                           "%r we tried to read %s bytes but "
-                                           "we were only able to read %s." %
-                                           (name, length, len(data)))
+                                             "%r we tried to read %s bytes but "
+                                             "we were only able to read %s." %
+                                             (name, length, len(data)))
                 try:
                     field.unpack(data)
                 except SuitcaseException:
