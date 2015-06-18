@@ -13,11 +13,8 @@ handlers will also provide notifications of error conditions
 (for instance, unexpected bytes or a bad checksum)
 
 """
+import six
 from suitcase.fields import Magic
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
 try:
     from functools import partial
 except ImportError:
@@ -82,7 +79,7 @@ class StreamProtocolHandler(object):
         self.packet_callback = packet_callback
 
         # internal state
-        self._available_bytes = ""
+        self._available_bytes = b""
         self._packet_generator = self._create_packet_generator()
 
     def _create_packet_generator(self):
@@ -102,7 +99,7 @@ class StreamProtocolHandler(object):
 
                         idx = self._available_bytes.find(magic_seq)
                         if idx == -1:  # no match in buffer
-                            self._available_bytes = ""
+                            self._available_bytes = b""
                             yield None
                         else:
                             self._available_bytes = self._available_bytes[idx:]
@@ -133,12 +130,11 @@ class StreamProtocolHandler(object):
             handler.
 
         """
-        assert isinstance(new_bytes, str)
         self._available_bytes += new_bytes
         callbacks = []
         try:
             while True:
-                packet = self._packet_generator.next()
+                packet = six.next(self._packet_generator)
                 if packet is None:
                     break
                 else:
@@ -171,4 +167,4 @@ class StreamProtocolHandler(object):
 
         """
         self._packet_generator = self._create_packet_generator()
-        self._available_bytes = ""
+        self._available_bytes = b""

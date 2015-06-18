@@ -3,14 +3,12 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #
 # Copyright (c) 2015 Digi International Inc. All Rights Reserved.
+import six
 
 from suitcase.exceptions import SuitcaseChecksumException, SuitcaseProgrammingError, \
     SuitcaseParseError, SuitcaseException, SuitcasePackStructException
 import struct
-try:
-    from cStringIO import StringIO
-except ImportError:
-    import StringIO
+from six import BytesIO, StringIO
 
 
 class FieldPlaceholder(object):
@@ -67,12 +65,13 @@ class BaseField(object):
     """
 
     def __new__(cls, *args, **kwargs):
-        if kwargs.get('instantiate', False):
-            return object.__new__(cls, *args, **kwargs)
+        instantiate = kwargs.pop('instantiate', False)
+        if instantiate:
+            return super(BaseField, cls).__new__(cls)
         else:
             return FieldPlaceholder(cls, args, kwargs)
 
-    def __init__(self, **kwargs):
+    def __init__(self, *args, **kwargs):
         self._value = None
         self._parent = kwargs.get('parent')
 
@@ -146,11 +145,11 @@ class CRCField(BaseField):
         recorded_checksum = self.field.getval()
         
         # replace checksum region with zero
-        data = ''.join((data[:offset],
-                        "\x00" * self.bytes_required,
-                        data[offset+self.bytes_required:])) 
+        data = b''.join((data[:offset],
+                         b"\x00" * self.bytes_required,
+                         data[offset + self.bytes_required:]))
         actual_checksum = self.algo(data[self.start:self.end])
-        if (recorded_checksum != actual_checksum):
+        if recorded_checksum != actual_checksum:
             raise SuitcaseChecksumException(
                 "recorded checksum %r did not match actual %r.  full data: %r",
                 recorded_checksum, actual_checksum, data)
@@ -158,19 +157,19 @@ class CRCField(BaseField):
     def packed_checksum(self, data):
         """Given the data of the entire packet reutrn the checksum bytes"""
         self.field.setval(self.algo(data[self.start:self.end]))
-        sio = StringIO()
+        sio = BytesIO()
         self.field.pack(sio)
         return sio.getvalue()
 
     def getval(self):
         return self.field.getval()
 
-    def setval(self):
+    def setval(self, *args):
         raise SuitcaseProgrammingError("CRC will be set automatically")
 
     def pack(self, stream):
         # write placeholder during the first pass
-        stream.write('\x00' * self.field.bytes_required)
+        stream.write(b'\x00' * self.field.bytes_required)
 
     def unpack(self, data):
         self.field.unpack(data)
@@ -187,7 +186,7 @@ class Magic(BaseField):
     def getval(self):
         return self.expected_sequence
 
-    def setval(self):
+    def setval(self, *args):
         raise SuitcaseProgrammingError("One does not simply modify Magic")
 
     def pack(self, stream):
@@ -348,9 +347,9 @@ class DispatchTarget(BaseField):
         self.dispatch_field = self._ph2f(dispatch_field)
         self.dispatch_mapping = dispatch_mapping
         self.inverse_dispatch_mapping = dict((v, k) for (k, v)
-                                             in dispatch_mapping.iteritems())
+                                             in dispatch_mapping.items())
 
-        self.length_provider._associate_length_consumer(self)
+        self.length_provider.associate_length_consumer(self)
 
     def _lookup_msg_type(self):
         target_key = self.dispatch_field.getval()
@@ -435,15 +434,15 @@ class LengthField(BaseField):
     def setval(self, value):
         raise SuitcaseProgrammingError("Cannot set the value of a LengthField")
 
-    def _associate_length_consumer(self, target_field):
+    def associate_length_consumer(self, target_field):
         def _length_value_provider():
-            sio = StringIO()
+            sio = BytesIO()
             target_field.pack(sio)
             target_field_length = len(sio.getvalue())
             if not target_field_length % self.multiplier == 0:
                 raise SuitcaseProgrammingError("Payload length not divisible "
                                              "by %s" % self.multiplier)
-            return (target_field_length / self.multiplier)
+            return (target_field_length // self.multiplier)
         self.length_value_provider = _length_value_provider
 
     def pack(self, stream):
@@ -541,7 +540,7 @@ class Payload(BaseField):
             self.length_provider = mock_length_provider
         elif isinstance(length_provider, FieldPlaceholder):
             self.length_provider = self._ph2f(length_provider)
-            self.length_provider._associate_length_consumer(self)
+            self.length_provider.associate_length_consumer(self)
         else:
             self.length_provider = None
 
@@ -569,7 +568,7 @@ class BaseVariableByteSequence(BaseField):
         self.make_format = make_format
         if length_provider is not None:
             self.length_provider = self._ph2f(length_provider)
-            self.length_provider._associate_length_consumer(self)
+            self.length_provider.associate_length_consumer(self)
 
     @property
     def bytes_required(self):
@@ -579,7 +578,7 @@ class BaseVariableByteSequence(BaseField):
         sfmt = self.make_format(len(self._value))
         try:
             stream.write(struct.pack(sfmt, *self._value))
-        except struct.error, e:
+        except struct.error as e:
             raise SuitcasePackStructException(e)
 
     def unpack(self, data):
@@ -589,7 +588,7 @@ class BaseVariableByteSequence(BaseField):
         sfmt = self.make_format(length)
         try:
             self._value = struct.unpack(sfmt, data)
-        except struct.error, e:
+        except struct.error as e:
             raise SuitcasePackStructException(e)
 
 
@@ -723,29 +722,29 @@ class BaseStructField(BaseField):
 #==============================================================================
 class UBInt8(BaseStructField):
     """Unsigned Big Endian 8-bit integer field"""
-    PACK_FORMAT = UNPACK_FORMAT = ">B"
+    PACK_FORMAT = UNPACK_FORMAT = b">B"
 
 
 class UBInt16(BaseStructField):
     """Unsigned Big Endian 16-bit integer field"""
-    PACK_FORMAT = UNPACK_FORMAT = ">H"
+    PACK_FORMAT = UNPACK_FORMAT = b">H"
 
 
 class UBInt24(BaseStructField):
     """Unsigned Big Endian 24-bit integer field"""
     KEEP_BYTES = 3
-    PACK_FORMAT = ">I"
-    UNPACK_FORMAT = ">BBB"
+    PACK_FORMAT = b">I"
+    UNPACK_FORMAT = b">BBB"
 
 
 class UBInt32(BaseStructField):
     """Unsigned Big Endian 32-bit integer field"""
-    PACK_FORMAT = UNPACK_FORMAT = ">I"
+    PACK_FORMAT = UNPACK_FORMAT = b">I"
 
 
 class UBInt64(BaseStructField):
     """Unsigned Big Endian 64-bit integer field"""
-    PACK_FORMAT = UNPACK_FORMAT = ">Q"
+    PACK_FORMAT = UNPACK_FORMAT = b">Q"
 
 
 #==============================================================================
@@ -753,22 +752,22 @@ class UBInt64(BaseStructField):
 #==============================================================================
 class SBInt8(BaseStructField):
     """Signed Big Endian 8-bit integer field"""
-    PACK_FORMAT = UNPACK_FORMAT = ">b"
+    PACK_FORMAT = UNPACK_FORMAT = b">b"
 
 
 class SBInt16(BaseStructField):
     """Signed Big Endian 16-bit integer field"""
-    PACK_FORMAT = UNPACK_FORMAT = ">h"
+    PACK_FORMAT = UNPACK_FORMAT = b">h"
 
 
 class SBInt32(BaseStructField):
     """Signed Big Endian 32-bit integer field"""
-    PACK_FORMAT = UNPACK_FORMAT = ">i"
+    PACK_FORMAT = UNPACK_FORMAT = b">i"
 
 
 class SBInt64(BaseStructField):
     """Signed Big Endian 64-bit integer field"""
-    PACK_FORMAT = UNPACK_FORMAT = ">q"
+    PACK_FORMAT = UNPACK_FORMAT = b">q"
 
 
 #==============================================================================
@@ -776,22 +775,22 @@ class SBInt64(BaseStructField):
 #==============================================================================
 class ULInt8(BaseStructField):
     """Unsigned Little Endian 8-bit integer field"""
-    PACK_FORMAT = UNPACK_FORMAT = "<B"
+    PACK_FORMAT = UNPACK_FORMAT = b"<B"
 
 
 class ULInt16(BaseStructField):
     """Unsigned Little Endian 16-bit integer field"""
-    PACK_FORMAT = UNPACK_FORMAT = "<H"
+    PACK_FORMAT = UNPACK_FORMAT = b"<H"
 
 
 class ULInt32(BaseStructField):
     """Unsigned Little Endian 32-bit integer field"""
-    PACK_FORMAT = UNPACK_FORMAT = "<I"
+    PACK_FORMAT = UNPACK_FORMAT = b"<I"
 
 
 class ULInt64(BaseStructField):
     """Unsigned Little Endian 64-bit integer field"""
-    PACK_FORMAT = UNPACK_FORMAT = "<Q"
+    PACK_FORMAT = UNPACK_FORMAT = b"<Q"
 
 
 #==============================================================================
@@ -799,22 +798,22 @@ class ULInt64(BaseStructField):
 #==============================================================================
 class SLInt8(BaseStructField):
     """Signed Little Endian 8-bit integer field"""
-    PACK_FORMAT = UNPACK_FORMAT = "<b"
+    PACK_FORMAT = UNPACK_FORMAT = b"<b"
 
 
 class SLInt16(BaseStructField):
     """Signed Little Endian 16-bit integer field"""
-    PACK_FORMAT = UNPACK_FORMAT = "<h"
+    PACK_FORMAT = UNPACK_FORMAT = b"<h"
 
 
 class SLInt32(BaseStructField):
     """Signed Little Endian 32-bit integer field"""
-    PACK_FORMAT = UNPACK_FORMAT = "<i"
+    PACK_FORMAT = UNPACK_FORMAT = b"<i"
 
 
 class SLInt64(BaseStructField):
     """Signed Little Endian 64-bit integer field"""
-    PACK_FORMAT = UNPACK_FORMAT = "<q"
+    PACK_FORMAT = UNPACK_FORMAT = b"<q"
 
 
 #==============================================================================
@@ -853,7 +852,7 @@ class _BitFieldField(object):
 
     def __new__(cls, *args, **kwargs):
         if 'instantiate' in kwargs:
-            return object.__new__(cls, *args, **kwargs)
+            return super(_BitFieldField, cls).__new__(cls)
         else:
             return _BitFieldFieldPlaceholder(cls, args, kwargs)
 
@@ -954,7 +953,7 @@ class BitField(BaseField):
                                          "8, was %d" % number_bits)
 
         self.number_bits = number_bits
-        self.number_bytes = number_bits / 8
+        self.number_bytes = number_bits // 8
         self.bytes_required = self.number_bytes
         if field is None:
             field = {
@@ -967,11 +966,11 @@ class BitField(BaseField):
         self._field = field.create_instance(self._parent)
 
         placeholders = []
-        for key, value in kwargs.iteritems():
+        for key, value in six.iteritems(kwargs):
             if isinstance(value, _BitFieldFieldPlaceholder):
                 placeholders.append((key, value))
 
-        for key, placeholder in sorted(placeholders, key=lambda (k, v): v.sequence_number):
+        for key, placeholder in sorted(placeholders, key=lambda kv: kv[1].sequence_number):
             value = placeholder.create_instance()
             self._bitfield_map[key] = value
             self._ordered_bitfields.append((key, value))
@@ -1011,7 +1010,7 @@ class BitField(BaseField):
             value |= ((field.getval() & mask) << shift)
 
         self._field.setval(value)
-        sio = StringIO()
+        sio = BytesIO()
         self._field.pack(sio)
         out = sio.getvalue()[-self.number_bytes:]
         stream.write(out)

@@ -4,7 +4,7 @@
 #
 # Copyright (c) 2015 Digi International Inc. All Rights Reserved.
 
-from StringIO import StringIO
+import six
 from suitcase.crc import crc16_ccitt
 from suitcase.exceptions import SuitcaseProgrammingError
 from suitcase.fields import DependentField, LengthField, VariableRawPayload, \
@@ -27,13 +27,13 @@ class SuperChild(Structure):
 
 # Message containing every field
 class SuperMessage(Structure):
-    magic = Magic('\xAA\xAA')
+    magic = Magic(b'\xAA\xAA')
 
     # bitfield
     options = BitField(8,
-        b1=BitBool(),
-        b2=BitBool(),
-        rest=BitNum(6))
+                       b1=BitBool(),
+                       b2=BitBool(),
+                       rest=BitNum(6))
 
     # unsigned big endian
     ubint8 = UBInt8()
@@ -78,8 +78,8 @@ class SuperMessage(Structure):
     # don't change anything... for test coverage
     ulint16_value = FieldProperty(ulint16)
     ulint16_byte_string = FieldProperty(ulint16,
-        onget=lambda v: str(v),
-        onset=lambda v: struct.unpack(">H", v)[0])
+                                        onget=lambda v: str(v),
+                                        onset=lambda v: struct.unpack(">H", v)[0])
 
     message_type = DispatchField(UBInt8())
     submessage_length = LengthField(UBInt16())
@@ -90,18 +90,16 @@ class SuperMessage(Structure):
     # checksum starts after beginning magic, ends before
     # the checksum
     crc = CRCField(UBInt16(), crc16_ccitt, 2, -3)
-    eof = Magic('~')
+    eof = Magic(b'~')
 
 
 class TestMagic(unittest.TestCase):
-
     def test_magic(self):
         magic_field = Magic('\xAA').create_instance(None)
         self.assertRaises(SuitcaseProgrammingError, magic_field.setval)
 
 
 class TestSuperField(unittest.TestCase):
-
     def _create_supermessage(self):
         s = SuperMessage()
 
@@ -123,7 +121,7 @@ class TestSuperField(unittest.TestCase):
 
         s.ulint8 = 0xAA
         s.ulint16 = 0xAABB
-        s.ulint16_byte_string = '\xAA\xBB'
+        s.ulint16_byte_string = b'\xAA\xBB'
         s.ulint16_value = 0xBBAA
 
         s.ulint32 = 0xAABBCCDD
@@ -143,7 +141,7 @@ class TestSuperField(unittest.TestCase):
         s.sbseqf = tuple([x - 2 for x in range(5)])
 
         sub = SuperChild()
-        sub.remaining = "Hello, this is SuperChild!"
+        sub.remaining = b"Hello, this is SuperChild!"
         s.submessage = sub
 
         return s
@@ -169,8 +167,9 @@ class TestSuperField(unittest.TestCase):
                 pass  # validity check baked into protocol
             else:
                 sm1_value = getattr(sm, key)
-                self.assertEqual(sm2_value, sm1_value, "%s: %s != %s, types(%s, %s)" %
-                                 (key, sm2_value, sm1_value, type(sm2_value), type(sm1_value)))
+                self.assertEqual(sm2_value, sm1_value,
+                                 "%s: %s != %s, types(%s, %s)" % (
+                                 key, sm2_value, sm1_value, type(sm2_value), type(sm1_value)))
 
     def test_repr_works(self):
         # just make sure nothing creashes
@@ -179,17 +178,15 @@ class TestSuperField(unittest.TestCase):
 
 
 class TestFieldProperty(unittest.TestCase):
-
     def test_basic_setget(self):
         # define the message
         class MyMessage(Structure):
             _version = UBInt8Sequence(2)
             version = FieldProperty(_version,
                                     onget=lambda v: "%d.%02d" % (v[0], v[1]),
-                                    onset=lambda v: tuple(int(x) for x
-                                                          in v.split(".", 1)))
+                                    onset=lambda v: tuple(int(six.b(x)) for x in v.split(".", 1)))
 
-        msg = MyMessage.from_data('\x10\x03')
+        msg = MyMessage.from_data(b'\x10\x03')
         self.assertEqual(msg._version, (16, 3))
         self.assertEqual(msg.version, "16.03")
 
@@ -204,7 +201,6 @@ class BasicMessage(Structure):
 
 
 class TestInstancePrototyping(unittest.TestCase):
-
     def test_independence(self):
         msg1 = BasicMessage()
         msg1.b1 = 10
@@ -219,7 +215,6 @@ class TestInstancePrototyping(unittest.TestCase):
 
 
 class TestLengthField(unittest.TestCase):
-
     class MyMuiltipliedLengthMessage(Structure):
         length = LengthField(UBInt8(), multiplier=8)
         payload = VariableRawPayload(length)
@@ -230,39 +225,38 @@ class TestLengthField(unittest.TestCase):
 
     def test_basic_length_pack(self):
         msg = self.MyLengthyMessage()
-        payload = "Hello, world!"
+        payload = b"Hello, world!"
         msg.payload = payload
-        self.assertEqual(msg.pack(), "\x00\x0DHello, world!")
+        self.assertEqual(msg.pack(), b"\x00\x0DHello, world!")
 
     def test_basic_length_unpack(self):
         msg = self.MyLengthyMessage()
-        msg.unpack('\x00\x0DHello, world!')
+        msg.unpack(b'\x00\x0DHello, world!')
         self.assertEqual(msg.length, 13)
-        self.assertEqual(msg.payload, "Hello, world!")
+        self.assertEqual(msg.payload, b"Hello, world!")
 
     def test_multiplied_length_pack(self):
         msg = self.MyMuiltipliedLengthMessage()
-        payload = ''.join(chr(x) for x in xrange(8 * 4))
+        payload = b''.join(six.b(chr(x)) for x in range(8 * 4))
         msg.payload = payload
-        self.assertEqual(msg.pack(), chr(4) + payload)
+        self.assertEqual(msg.pack(), b'\x04' + payload)
 
     def test_bad_modulus_multiplier(self):
         cls = self.MyMuiltipliedLengthMessage
         msg = self.MyMuiltipliedLengthMessage()
-        payload = '\x01'  # 1-byte is not modulo 8
+        payload = b'\x01'  # 1-byte is not modulo 8
         msg.payload = payload
         self.assertRaises(SuitcaseProgrammingError, msg.pack)
 
     def test_multiplied_length_unpack(self):
         msg = self.MyMuiltipliedLengthMessage()
-        msg.unpack(chr(4) + ''.join([chr(x) for x in xrange(8 * 4)]))
+        msg.unpack(b'\x04' + b''.join([six.b(chr(x)) for x in range(8 * 4)]))
         self.assertEqual(msg.length, 4)
         self.assertEqual(msg.payload,
-                         ''.join([chr(x) for x in xrange(8 * 4)]))
+                         b''.join([six.b(chr(x)) for x in range(8 * 4)]))
 
 
 class TestByteSequence(unittest.TestCase):
-
     def test_fixed_sequence(self):
         class MySeqMessage(Structure):
             type = UBInt8()
@@ -273,8 +267,8 @@ class TestByteSequence(unittest.TestCase):
         msg.byte_values = (0, 1, 2, 3, 4, 5, 6, 7, 8,
                            9, 10, 11, 12, 13, 14, 15)
         self.assertEqual(msg.pack(),
-                         '\x00\x00\x01\x02\x03\x04\x05\x06\x07\x08'
-                         '\t\n\x0b\x0c\r\x0e\x0f')
+                         b'\x00\x00\x01\x02\x03\x04\x05\x06\x07\x08'
+                         b'\t\n\x0b\x0c\r\x0e\x0f')
 
     def test_variable_sequence(self):
         class MyVarSeqMessage(Structure):
@@ -287,7 +281,7 @@ class TestByteSequence(unittest.TestCase):
         msg.seq = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
 
         self.assertEqual(msg.pack(),
-                         '\x00\n\x01\x02\x03\x04\x05\x06\x07\x08\t\n')
+                         b'\x00\n\x01\x02\x03\x04\x05\x06\x07\x08\t\n')
         msg2 = MyVarSeqMessage()
         msg2.unpack(msg.pack())
         self.assertEqual(msg2.length, 10)
@@ -299,10 +293,10 @@ class TestByteSequence(unittest.TestCase):
             b = UBInt8Sequence(None)
 
         m = MyVarSeqMessage()
-        m.s = "Hello, world - "
+        m.s = b"Hello, world - "
         m.b = [0, 1, 2, 3, 4, 5]
         self.assertEqual(m.pack(),
-                         'Hello, world - \x00\x01\x02\x03\x04\x05')
+                         b'Hello, world - \x00\x01\x02\x03\x04\x05')
 
 
 class MyTargetMessage(Structure):
@@ -347,66 +341,64 @@ class BoxedGreedy(Structure):
 
 
 class TestGreedyFields(unittest.TestCase):
-
     def test_unpack_basic_greedy(self):
         # Test case with trailing greedy payload
         m = BasicGreedy()
-        m.unpack("\x00\x01Hello, you greedy, greedy World!")
+        m.unpack(b"\x00\x01Hello, you greedy, greedy World!")
         self.assertEqual(m.a, 0x00)
         self.assertEqual(m.b, 0x01)
-        self.assertEqual(m.payload, "Hello, you greedy, greedy World!")
+        self.assertEqual(m.payload, b"Hello, you greedy, greedy World!")
 
     def test_unpack_boxed_greedy(self):
         # Test case where fields exist on either side of payload
 
         m = BoxedGreedy()
-        m.unpack("\x05\x00This is the payload\x00\x15ABCDE")
+        m.unpack(b"\x05\x00This is the payload\x00\x15ABCDE")
         self.assertEqual(m.a, 5)
         self.assertEqual(m.b, 0)
-        self.assertEqual(m.payload, "This is the payload")
+        self.assertEqual(m.payload, b"This is the payload")
         self.assertEqual(m.c, 0x15)
-        self.assertEqual(m.d, "ABCDE")
+        self.assertEqual(m.d, b"ABCDE")
 
     def test_pack_basic_greedy(self):
         m = BasicGreedy()
         m.a = 10
         m.b = 20
-        m.payload = "This is a packed greedy payload"
-        self.assertEqual(m.pack(), '\n\x14This is a packed greedy payload')
+        m.payload = b"This is a packed greedy payload"
+        self.assertEqual(m.pack(), b'\n\x14This is a packed greedy payload')
 
     def test_pack_boxed_greedy(self):
         m = BoxedGreedy()
         m.b = 20
         m.c = 300
-        m.d = "ABCD"
-        m.payload = "My length isn't declared and I am in the middle"
+        m.d = b"ABCD"
+        m.payload = b"My length isn't declared and I am in the middle"
         self.assertEqual(m.pack(),
-                         "\x04\x14My length isn't declared and I am in the "
-                         "middle\x01,ABCD")
+                         b"\x04\x14My length isn't declared and I am in the "
+                         b"middle\x01,ABCD")
 
 
 class TestMessageDispatching(unittest.TestCase):
-
     def test_dispatch_packing(self):
         msg = MyBasicDispatchMessage()
         target_msg = MyTargetMessage()
-        target_msg.payload = "Hello, world!"
+        target_msg.payload = b"Hello, world!"
         msg.body = target_msg
-        self.assertEqual(msg.pack(), "\x00\x00\rHello, world!")
+        self.assertEqual(msg.pack(), b"\x00\x00\rHello, world!")
 
         msg2 = MyBasicDispatchMessage()
         target_msg = MyOtherTargetMessage()
         target_msg.sequence = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
         msg2.body = target_msg
         self.assertEqual(msg2.pack(),
-            '\x01\x00\x0b\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n')
+                         b'\x01\x00\x0b\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n')
 
     def test_dispatch_unpacking(self):
         msg = MyBasicDispatchMessage()
-        msg.unpack("\x00\x00\rHello, world!")
+        msg.unpack(b"\x00\x00\rHello, world!")
         self.assertEqual(msg.type, 0x00)
         body = msg.body
-        self.assertEqual(body.payload, "Hello, world!")
+        self.assertEqual(body.payload, b"Hello, world!")
 
     def test_foreign_type(self):
         msg = MyBasicDispatchMessage()
@@ -415,19 +407,18 @@ class TestMessageDispatching(unittest.TestCase):
 
     def test_default_dispatch(self):
         msg = MyBasicDispatchMessage()
-        msg.unpack("\x10\x00\rHello, world!")
+        msg.unpack(b"\x10\x00\rHello, world!")
         self.assert_(isinstance(msg.body, MyDefaultTargetMessage))
 
 
 class TestBitFields(unittest.TestCase):
-
     def test_packing(self):
         field_proto = BitField(16,
-            nib1=BitNum(4),
-            nib2=BitNum(4),
-            nib3=BitNum(4),
-            nib4=BitNum(4),
-        )
+                               nib1=BitNum(4),
+                               nib2=BitNum(4),
+                               nib3=BitNum(4),
+                               nib4=BitNum(4),
+                               )
         field = field_proto.create_instance(None)
 
         field.nib1 = 1
@@ -436,7 +427,7 @@ class TestBitFields(unittest.TestCase):
         field.nib4 = 4
 
         field2 = field_proto.create_instance(None)
-        sio = StringIO()
+        sio = six.BytesIO()
         field.pack(sio)
         field2.unpack(sio.getvalue())
         self.assertEqual(field2.nib1, 1)
@@ -446,27 +437,27 @@ class TestBitFields(unittest.TestCase):
 
     def test_bad_operations(self):
         field_proto = BitField(7,
-            num=BitNum(7))
+                               num=BitNum(7))
         self.assertRaises(SuitcaseProgrammingError,
                           field_proto.create_instance, None)
 
     def test_explicit_field_override(self):
         field_proto = BitField(16, ULInt16(),
-            b1=BitBool(),
-            b2=BitBool(),
-            remaining=BitNum(14))
+                               b1=BitBool(),
+                               b2=BitBool(),
+                               remaining=BitNum(14))
         inst = field_proto.create_instance(None)
         inst.b1 = True
         inst.b2 = False
         inst.remaining = 0x1EF
-        sio = StringIO()
+        sio = six.BytesIO()
         inst.pack(sio)
 
         # should be packed in little endian form
-        self.assertEqual(sio.getvalue(), "\xef\x81")
+        self.assertEqual(sio.getvalue(), b"\xef\x81")
 
         inst2 = field_proto.create_instance(None)
-        inst2.unpack("\xef\x81")
+        inst2.unpack(b"\xef\x81")
         self.assertEqual(inst.b1, inst2.b1)
         self.assertEqual(inst.b2, inst2.b2)
         self.assertEqual(inst.remaining, inst2.remaining)
@@ -479,27 +470,27 @@ class Conditional(Structure):
 
 
 class TestConditionalField(unittest.TestCase):
-
     def test_conditional_pack(self):
         m1 = Conditional()
         m1.f1 = 0x91
-        self.assertEqual(m1.pack(), '\x91')
+        self.assertEqual(m1.pack(), b'\x91')
 
         m2 = Conditional()
         m2.f1 = 0xFF
         m2.f2 = 0x09
-        self.assertEqual(m2.pack(), '\xff\x09')
+        self.assertEqual(m2.pack(), b'\xff\x09')
 
     def test_conditional_rx(self):
         m1 = Conditional()
-        m1.unpack('\x1f')
+        m1.unpack(b'\x1f')
         self.assertEqual(m1.f1, 0x1f)
         self.assertEqual(m1.f2, None)
 
         m2 = Conditional()
-        m2.unpack('\xff\x1f')
+        m2.unpack(b'\xff\x1f')
         self.assertEqual(m2.f1, 0xff)
         self.assertEqual(m2.f2, 0x1f)
+
 
 if __name__ == "__main__":
     unittest.main()

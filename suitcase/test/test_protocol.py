@@ -3,6 +3,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #
 # Copyright (c) 2015 Digi International Inc. All Rights Reserved.
+import six
 
 from suitcase.fields import Magic, SBInt64, DispatchField, UBInt8, DispatchTarget, \
     LengthField
@@ -13,7 +14,7 @@ import unittest
 
 
 class MagicSchema(Structure):
-    magic = Magic('\xAA\xAA')
+    magic = Magic(b'\xAA\xAA')
     value = SBInt64()
 
 
@@ -34,7 +35,7 @@ class TestStreamProtocol(unittest.TestCase):
             packets_received.append(packet)
 
         f = UDPFrame()
-        f.data = "Hello, world"
+        f.data = b"Hello, world"
         f.checksum = 0x01
         f.destination_port = 9000
         f.source_port = 8000
@@ -49,7 +50,7 @@ class TestStreamProtocol(unittest.TestCase):
 
         assert(len(packets_received) == 1)
         rx = packets_received[0]
-        assert rx.data == "Hello, world"
+        assert rx.data == b"Hello, world"
         assert rx.checksum == 0x01
         assert rx.destination_port == 9000
         assert rx.source_port == 8000
@@ -73,7 +74,7 @@ class TestStreamProtocol(unittest.TestCase):
         good_msg.body.value = -31415926
         good_packet = good_msg.pack()
 
-        bad_packet = '\x01\x02\xAA\xAA' + good_packet
+        bad_packet = b'\x01\x02\xAA\xAA' + good_packet
         phandler = StreamProtocolHandler(ErrorCaseSchema, bad_cb)
         phandler.feed(bad_packet)
 
@@ -94,7 +95,7 @@ class TestStreamProtocol(unittest.TestCase):
         pack = test_sequence.pack()
 
         # garbage with our bytes in the middle
-        test_bytes = '\x1A\x3fadbsfkasdf;aslkfjasd;f' + pack + '\x00\x00asdfn234r'
+        test_bytes = b'\x1A\x3fadbsfkasdf;aslkfjasd;f' + pack + b'\x00\x00asdfn234r'
         protocol_handler.feed(test_bytes)
         self.assertEqual(len(rx), 1)
         self.assertEqual(rx[0].value, -29939)
@@ -111,9 +112,9 @@ class TestStreamProtocol(unittest.TestCase):
         pack = test_sequence.pack()
 
         # garbage with our bytes in the middle
-        test_bytes = '\x1A\x3fadbsfkasdf;aslkfjasd;f' + pack + '\x00\x00asdfn234r'
-        for b in test_bytes:
-            protocol_handler.feed(b)
+        test_bytes = b'\x1A\x3fadbsfkasdf;aslkfjasd;f' + pack + b'\x00\x00asdfn234r'
+        for b in six.iterbytes(test_bytes):
+            protocol_handler.feed(six.b(chr(b)))
         self.assertEqual(len(rx), 1)
         self.assertEqual(rx[0].value, -29939)
 

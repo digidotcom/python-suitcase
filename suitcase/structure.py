@@ -3,15 +3,13 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #
 # Copyright (c) 2015 Digi International Inc. All Rights Reserved.
+import sys
 
-from suitcase.exceptions import SuitcaseChecksumException, SuitcaseException, \
+import six
+from suitcase.exceptions import SuitcaseException, \
     SuitcasePackException, SuitcaseParseError
 from suitcase.fields import FieldPlaceholder, CRCField
-import sys
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
+from six import BytesIO
 
 
 class ParseError(Exception):
@@ -26,7 +24,7 @@ class Packer(object):
         self.ordered_fields = ordered_fields
 
     def pack(self):
-        sio = StringIO()
+        sio = BytesIO()
         self.write(sio)
         return sio.getvalue()
 
@@ -46,9 +44,8 @@ class Packer(object):
             except Exception:
                 # keep the original traceback information, see
                 # http://stackoverflow.com/questions/3847503/wrapping-exceptions-in-python
-                trace = sys.exc_info()[2]
-                raise SuitcasePackException("Unexpected exception during pack "
-                                          "of %r" % name), None, trace
+                exc_value = SuitcasePackException("Unexpected exception during pack of %r" % name)
+                six.reraise(type(exc_value), exc_value, sys.exc_info()[2])
 
         # if there is a crc value, seek back to the field and
         # pack it with the right value
@@ -60,7 +57,7 @@ class Packer(object):
                 stream.write(checksum_data)
 
     def unpack(self, data):
-        self.unpack_stream(StringIO(data))
+        self.unpack_stream(BytesIO(data))
 
     def unpack_stream(self, stream):
         """Unpack bytes from a stream of data field-by-field
@@ -104,13 +101,12 @@ class Packer(object):
             except SuitcaseException:
                 raise  # just re-raise these
             except Exception:
-                trace = sys.exc_info()[2]
-                raise SuitcaseParseError("Unexpected exception while unpacking "
-                                       "field %r" % name), None, trace
+                exc_value = SuitcaseParseError("Unexpected exception while unpacking field %r" % name)
+                six.reraise(type(exc_value), exc_value, sys.exc_info()[2])
 
         if greedy_field is not None:
             remaining_data = stream.read()
-            inverted_stream = StringIO(remaining_data[::-1])
+            inverted_stream = BytesIO(remaining_data[::-1])
 
             # work through the remaining fields in reverse order in order
             # to narrow in on the right bytes for the greedy field
@@ -131,10 +127,8 @@ class Packer(object):
                 except SuitcaseException:
                     raise  # just re-raise these
                 except Exception:
-                    trace = sys.exc_info()[2]
-                    raise SuitcaseParseError("Unexpected exception while "
-                                           "unpacking field "
-                                           "%r" % name), None, trace
+                    exc_value = SuitcaseParseError("Unexpected exception while unpacking field %r" % name)
+                    six.reraise(type(exc_value), exc_value, sys.exc_info()[2])
 
             greedy_data_chunk = inverted_stream.read()[::-1]
             greedy_field.unpack(greedy_data_chunk)
@@ -145,11 +139,11 @@ class Packer(object):
                 crc_field.validate(data, offset)
 
 
-class MessageMeta(type):
-    """Metaclass for all message objects
+class StructureMeta(type):
+    """Metaclass for all structure objects
 
     When a class with this metaclass is created, we look for any
-    FieldPrpoerty instances associated with the class and record
+    FieldProperty instances associated with the class and record
     those for use later on.
 
     """
@@ -160,7 +154,7 @@ class MessageMeta(type):
         # do not get in the way.
         dct['_field_placeholders'] = {}
         dct['_crc_field'] = None
-        for key, value in dct.items():  # use a copy, we mutate dct
+        for key, value in list(dct.items()):  # use a copy, we mutate dct
             if isinstance(value, FieldPlaceholder):
                 dct['_field_placeholders'][key] = value
                 dct['__%s' % key] = value
@@ -169,11 +163,12 @@ class MessageMeta(type):
                     dct['_crc_field'] = value
 
         sorted_fields = list(sorted(dct['_field_placeholders'].items(),
-                                    key=lambda (k, v): v._field_seqno))
+                                    key=lambda kv: kv[1]._field_seqno))
         dct['_sorted_fields'] = sorted_fields
         return type.__new__(cls, name, bases, dct)
 
 
+@six.add_metaclass(StructureMeta)
 class Structure(object):
     r"""Base class for message schema declaration
 
@@ -215,7 +210,7 @@ class Structure(object):
 
     """
 
-    __metaclass__ = MessageMeta
+    __metaclass__ = StructureMeta
 
     @classmethod
     def from_data(cls, data):

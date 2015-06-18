@@ -17,6 +17,7 @@ import binascii
 # using the following command-line:
 #
 # ./pycrc.py --model=ccitt --generate table
+import six
 
 CRC16_CCITT_TAB = \
 [
@@ -113,8 +114,8 @@ def crc16_ccitt(data, crc=0):
 
     """
     tab = CRC16_CCITT_TAB  # minor optimization (now in loacls)
-    for byte in data:
-        crc = (((crc << 8) & 0xff00) ^ tab[((crc >> 8) & 0xff) ^ ord(byte)])
+    for byte in six.iterbytes(data):
+        crc = (((crc << 8) & 0xff00) ^ tab[((crc >> 8) & 0xff) ^ byte])
     return crc & 0xffff
 
 
