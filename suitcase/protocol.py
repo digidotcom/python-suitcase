@@ -13,22 +13,10 @@ handlers will also provide notifications of error conditions
 (for instance, unexpected bytes or a bad checksum)
 
 """
+from functools import partial
+
 import six
 from suitcase.fields import Magic
-
-try:
-    from functools import partial
-except ImportError:
-    def partial(func, *args, **kwargs):
-        def newfunc(*fargs, **fkeywords):
-            newkeywords = kwargs.copy()
-            newkeywords.update(fkeywords)
-            return func(*(args + fargs), **newkeywords)
-
-        newfunc.func = func
-        newfunc.args = args
-        newfunc.keywords = kwargs
-        return newfunc
 
 
 class StreamProtocolHandler(object):
