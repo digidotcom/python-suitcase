@@ -5,6 +5,4 @@ nose
 mock
 sphinx
 tox
-
-# coveralls requires a vesrion >=3.6,<3.999
-coverage==3.7.1
+coverage
