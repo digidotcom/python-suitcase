@@ -115,3 +115,12 @@ The library seeks to adhere to these core principles:
   norm, the library should still provide some useful code that can be
   reused.  Some parts of the library might need to be abandoned, but
   the hope would be that one would not need to start from scratch.
+
+License
+-------
+
+This software is open-source software. Copyright Digi International, 2015.
+
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this file,
+you can obtain one at http://mozilla.org/MPL/2.0/.
