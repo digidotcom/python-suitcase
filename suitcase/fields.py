@@ -144,6 +144,10 @@ class CRCField(BaseField):
         """Raises :class:`SuitcaseChecksumException` if not valid"""
         recorded_checksum = self.field.getval()
 
+        # convert negative offset to positive
+        if offset < 0:
+            offset += len(data)
+
         # replace checksum region with zero
         data = b''.join((data[:offset],
                          b"\x00" * self.bytes_required,
@@ -532,14 +536,7 @@ class Payload(BaseField):
 
     def __init__(self, length_provider=None, **kwargs):
         BaseField.__init__(self, **kwargs)
-        if isinstance(length_provider, int):
-            class mock_length_provider:
-                @staticmethod
-                def get_adjusted_length():
-                    return length_provider
-
-            self.length_provider = mock_length_provider
-        elif isinstance(length_provider, FieldPlaceholder):
+        if isinstance(length_provider, FieldPlaceholder):
             self.length_provider = self._ph2f(length_provider)
             self.length_provider.associate_length_consumer(self)
         else:
@@ -659,10 +656,16 @@ class BaseFixedByteSequence(BaseField):
         self.format = make_format(size)
 
     def pack(self, stream):
-        stream.write(struct.pack(self.format, *self._value))
+        try:
+            stream.write(struct.pack(self.format, *self._value))
+        except struct.error as e:
+            raise SuitcasePackStructException(e)
 
     def unpack(self, data):
-        self._value = struct.unpack(self.format, data)
+        try:
+            self._value = struct.unpack(self.format, data)
+        except struct.error as e:
+            raise SuitcasePackStructException(e)
 
 
 def byte_sequence_factory_factory(make_format):
@@ -704,11 +707,14 @@ class BaseStructField(BaseField):
             self.bytes_required = struct.calcsize(self.PACK_FORMAT)
 
     def pack(self, stream):
-        keep_bytes = getattr(self, 'KEEP_BYTES', None)
-        if keep_bytes is not None:
-            to_write = struct.pack(self.PACK_FORMAT, self._value)[-keep_bytes:]
-        else:
-            to_write = struct.pack(self.PACK_FORMAT, self._value)
+        try:
+            keep_bytes = getattr(self, 'KEEP_BYTES', None)
+            if keep_bytes is not None:
+                to_write = struct.pack(self.PACK_FORMAT, self._value)[-keep_bytes:]
+            else:
+                to_write = struct.pack(self.PACK_FORMAT, self._value)
+        except struct.error as e:
+            raise SuitcasePackStructException(e)
         stream.write(to_write)
 
     def unpack(self, data):

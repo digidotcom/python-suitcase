@@ -7,8 +7,9 @@
 import unittest
 
 import six
-from suitcase.crc import crc16_ccitt
-from suitcase.exceptions import SuitcaseProgrammingError
+from suitcase.crc import crc16_ccitt, crc32
+from suitcase.exceptions import SuitcaseProgrammingError, SuitcasePackStructException, SuitcasePackException, \
+    SuitcaseParseError
 from suitcase.fields import DependentField, LengthField, VariableRawPayload, \
     Magic, BitField, BitBool, BitNum, UBInt8, UBInt16, UBInt24, UBInt32, UBInt64, \
     SBInt8, SBInt16, SBInt32, SBInt64, ULInt8, ULInt16, ULInt32, ULInt64, SLInt8, \
@@ -16,6 +17,10 @@ from suitcase.fields import DependentField, LengthField, VariableRawPayload, \
     FieldProperty, DispatchField, DispatchTarget, CRCField, Payload
 from suitcase.structure import Structure
 import struct
+
+
+def raise_value_error(*args, **kwargs):
+    raise ValueError("Artifically Raised ValueError")
 
 
 class SuperChild(Structure):
@@ -172,8 +177,26 @@ class TestSuperField(unittest.TestCase):
                                  "%s: %s != %s, types(%s, %s)" % (
                                      key, sm2_value, sm1_value, type(sm2_value), type(sm1_value)))
 
+    def test_struct_packing_exceptions(self):
+        # Verify that exceptions available all work
+        sm = self._create_supermessage()
+        sm.ubint8 = 0xFFFF  # too big
+        self.assertRaises(SuitcasePackStructException, sm.pack)
+        try:
+            sm.pack()
+        except SuitcasePackStructException as e:
+            self.assertEqual(str(e), 'ubyte format requires 0 <= number <= 255')
+            self.assertEqual(repr(e), "error('ubyte format requires 0 <= number <= 255',)")
+        else:
+            self.fail("SuitcasePackStructException not raised")
+
+    def test_other_pack_exception(self):
+        sm = self._create_supermessage()
+        sm._key_to_field['ubint8'].pack = raise_value_error
+        self.assertRaises(SuitcasePackException, sm.pack)
+
     def test_repr_works(self):
-        # just make sure nothing creashes
+        # just make sure nothing crashes
         sm = self._create_supermessage()
         repr(sm)
 
@@ -256,6 +279,10 @@ class TestLengthField(unittest.TestCase):
         self.assertEqual(msg.payload,
                          b''.join([six.b(chr(x)) for x in range(8 * 4)]))
 
+    def test_unpack_insufficient_bytes(self):
+        msg = self.MyLengthyMessage()
+        self.assertRaises(SuitcaseParseError, msg.unpack, b'\x00\x0DHello')
+
 
 class TestByteSequence(unittest.TestCase):
     def test_fixed_sequence(self):
@@ -334,11 +361,20 @@ class BasicGreedy(Structure):
 
 
 class BoxedGreedy(Structure):
+    sof = Magic(b'\xAA')
     a = LengthField(UBInt8())
     b = UBInt8()
     payload = Payload()
     c = UBInt16()
     d = VariableRawPayload(a)
+    eof = Magic(b'\xbb')
+
+
+class CRCGreedyTail(Structure):
+
+    payload = Payload()
+    magic = Magic(b'~~')
+    crc = CRCField(UBInt32(), crc32, 0, -1)  # all (checksum zeroed)
 
 
 class TestGreedyFields(unittest.TestCase):
@@ -352,14 +388,32 @@ class TestGreedyFields(unittest.TestCase):
 
     def test_unpack_boxed_greedy(self):
         # Test case where fields exist on either side of payload
-
         m = BoxedGreedy()
-        m.unpack(b"\x05\x00This is the payload\x00\x15ABCDE")
+        m.unpack(b"\xaa\x05\x00This is the payload\x00\x15ABCDE\xbb")
         self.assertEqual(m.a, 5)
         self.assertEqual(m.b, 0)
         self.assertEqual(m.payload, b"This is the payload")
         self.assertEqual(m.c, 0x15)
         self.assertEqual(m.d, b"ABCDE")
+
+    def test_unpack_boxed_greedy_error_before_greedy(self):
+        # should start with \xAA but does not
+        m = BoxedGreedy()
+        self.assertRaises(SuitcaseParseError, m.unpack,
+                          b"\x11\x05\x00This is the payload\x00\x15ABCDE\xbb")
+        m._key_to_field['sof'].unpack = raise_value_error  # simulate fault
+        self.assertRaises(SuitcaseParseError, m.unpack,
+                          b"\xaa\x05\x00This is the payload\x00\x15ABCDE\xbb")
+
+    def test_unpack_boxed_greedy_error_after_greedy(self):
+        # should end in \xBB but does not
+        m = BoxedGreedy()
+        self.assertRaises(SuitcaseParseError, m.unpack,
+                          b"\xaa\x05\x00This is the payload\x00\x15ABCDE\xAF")
+
+        m._key_to_field['eof'].unpack = raise_value_error  # simlulate fault
+        self.assertRaises(SuitcaseParseError, m.unpack,
+                          b"\xaa\x05\x00This is the payload\x00\x15ABCDE\xbb")
 
     def test_pack_basic_greedy(self):
         m = BasicGreedy()
@@ -375,8 +429,20 @@ class TestGreedyFields(unittest.TestCase):
         m.d = b"ABCD"
         m.payload = b"My length isn't declared and I am in the middle"
         self.assertEqual(m.pack(),
-                         b"\x04\x14My length isn't declared and I am in the "
-                         b"middle\x01,ABCD")
+                         b"\xaa\x04\x14My length isn't declared and I am in the "
+                         b"middle\x01,ABCD\xbb")
+
+    def test_greedy_tail_pack_basic(self):
+        m = CRCGreedyTail()
+        m.payload = b"A GREEDY PAYLOAD FROM THE START"
+        self.assertEqual(m.pack(), b'A GREEDY PAYLOAD FROM THE START~~\xfc\xce`=')
+
+    def test_greedy_tail_unpack_basic(self):
+        m = CRCGreedyTail.from_data(b'A GREEDY PAYLOAD FROM THE START~~\xfc\xce`=')
+        self.assertEqual(m.payload, b"A GREEDY PAYLOAD FROM THE START")
+
+    def test_greedy_tail_not_enough_bytes(self):
+        self.assertRaises(SuitcaseParseError, CRCGreedyTail.from_data, b'~\xfc\xce`=')
 
 
 class TestMessageDispatching(unittest.TestCase):
