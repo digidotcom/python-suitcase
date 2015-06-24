@@ -1,0 +1,246 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>suitcase.protocol &mdash; suitcase 0.7 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.7',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="suitcase 0.7 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" />
+   
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+
+  </head>
+  <body role="document">  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for suitcase.protocol</h1><div class="highlight"><pre>
+<span class="c"># This Source Code Form is subject to the terms of the Mozilla Public</span>
+<span class="c"># License, v. 2.0. If a copy of the MPL was not distributed with this</span>
+<span class="c"># file, You can obtain one at http://mozilla.org/MPL/2.0/.</span>
+<span class="c">#</span>
+<span class="c"># Copyright (c) 2015 Digi International Inc. All Rights Reserved.</span>
+
+<span class="sd">&quot;&quot;&quot;Define protocol handlers for different classes of protocols</span>
+
+<span class="sd">These protocols all wrap some base message schema and provide</span>
+<span class="sd">all the necessary hooks for pushing in a stream of bytes and</span>
+<span class="sd">getting out packets in the order they were found.  The protocol</span>
+<span class="sd">handlers will also provide notifications of error conditions</span>
+<span class="sd">(for instance, unexpected bytes or a bad checksum)</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">partial</span>
+
+<span class="kn">import</span> <span class="nn">six</span>
+<span class="kn">from</span> <span class="nn">suitcase.fields</span> <span class="kn">import</span> <span class="n">Magic</span>
+
+
+<div class="viewcode-block" id="StreamProtocolHandler"><a class="viewcode-back" href="../../api.html#suitcase.protocol.StreamProtocolHandler">[docs]</a><span class="k">class</span> <span class="nc">StreamProtocolHandler</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Protocol handler that deals fluidly with a stream of bytes</span>
+
+<span class="sd">    The protocol handler is agnostic to the data source or methodology</span>
+<span class="sd">    being used to collect the data  (blocking reads on a socket to async</span>
+<span class="sd">    IO on a serial port).</span>
+
+<span class="sd">    Here&#39;s an example of what one usage might look like (very simple</span>
+<span class="sd">    appraoch for parsing a simple tcp protocol::</span>
+
+
+<span class="sd">        from suitcase.protocol import StreamProtocolHandler</span>
+<span class="sd">        from suitcase.fields import LengthField, UBInt16, VariableRawPayload</span>
+<span class="sd">        from suitcase.struct import Structure</span>
+<span class="sd">        import socket</span>
+
+<span class="sd">        class SimpleFramedMessage(Structure):</span>
+<span class="sd">            length = LengthField(UBInt16())</span>
+<span class="sd">            payload = VariableRawPayload(length)</span>
+
+<span class="sd">        def packet_received(packet):</span>
+<span class="sd">            print packet</span>
+
+<span class="sd">        def run_forever(host, port):</span>
+<span class="sd">            protocol_handler = StreamProtocolHandler(SimpleFramedMessage,</span>
+<span class="sd">                                                     packet_received)</span>
+<span class="sd">            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)</span>
+<span class="sd">            sock.connect(host, port)</span>
+<span class="sd">            sock.setblocking(1)</span>
+<span class="sd">            while True:</span>
+<span class="sd">                bytes = sock.recv(1024)</span>
+<span class="sd">                if len(bytes) == 0:</span>
+<span class="sd">                    print &quot;Socket closed... exiting&quot;</span>
+<span class="sd">                    return</span>
+<span class="sd">                else:</span>
+<span class="sd">                    protocol_handler.feed(bytes)</span>
+
+<span class="sd">    :param message_schema: The top-level message schema that defines the</span>
+<span class="sd">        packets for the protocol to be used.</span>
+<span class="sd">    :param packet_callback: A callback to be executed with the form</span>
+<span class="sd">        ``callback(packet)`` when a fully-formed packet is detected.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message_schema</span><span class="p">,</span> <span class="n">packet_callback</span><span class="p">):</span>
+        <span class="c"># configuration parameters</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">message_schema</span> <span class="o">=</span> <span class="n">message_schema</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">packet_callback</span> <span class="o">=</span> <span class="n">packet_callback</span>
+
+        <span class="c"># internal state</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_available_bytes</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_packet_generator</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_packet_generator</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_create_packet_generator</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">while</span> <span class="bp">True</span><span class="p">:</span>
+            <span class="n">curmsg</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">message_schema</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">_name</span><span class="p">,</span> <span class="n">field</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">curmsg</span><span class="p">):</span>
+                <span class="n">bytes_required</span> <span class="o">=</span> <span class="n">field</span><span class="o">.</span><span class="n">bytes_required</span>
+
+                <span class="c"># if the first byte is magic, go with a scanning behavior</span>
+                <span class="c"># where we just chop off one byte at a time</span>
+                <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">Magic</span><span class="p">):</span>
+                    <span class="n">magic_seq</span> <span class="o">=</span> <span class="n">field</span><span class="o">.</span><span class="n">getval</span><span class="p">()</span>
+                    <span class="k">while</span> <span class="bp">True</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_available_bytes</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">bytes_required</span><span class="p">:</span>
+                            <span class="k">yield</span> <span class="bp">None</span>
+                            <span class="k">continue</span>
+
+                        <span class="n">idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_available_bytes</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="n">magic_seq</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">idx</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>  <span class="c"># no match in buffer</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">_available_bytes</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&quot;</span>
+                            <span class="k">yield</span> <span class="bp">None</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">_available_bytes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_available_bytes</span><span class="p">[</span><span class="n">idx</span><span class="p">:]</span>
+                            <span class="k">break</span>  <span class="c"># continue processing</span>
+
+                <span class="c"># For a specific field, read until we have enough bytes</span>
+                <span class="c"># and then give the field a try.</span>
+                <span class="k">while</span> <span class="bp">True</span><span class="p">:</span>
+                    <span class="n">bytes_available</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_available_bytes</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">bytes_required</span> <span class="o">&lt;=</span> <span class="n">bytes_available</span><span class="p">:</span>
+                        <span class="n">field_bytes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_available_bytes</span><span class="p">[:</span><span class="n">bytes_required</span><span class="p">]</span>
+                        <span class="n">new_bytes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_available_bytes</span><span class="p">[</span><span class="n">bytes_required</span><span class="p">:]</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_available_bytes</span> <span class="o">=</span> <span class="n">new_bytes</span>
+                        <span class="n">field</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="n">field_bytes</span><span class="p">)</span>
+                        <span class="k">break</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">yield</span> <span class="bp">None</span>
+            <span class="k">yield</span> <span class="n">curmsg</span>
+
+<div class="viewcode-block" id="StreamProtocolHandler.feed"><a class="viewcode-back" href="../../api.html#suitcase.protocol.StreamProtocolHandler.feed">[docs]</a>    <span class="k">def</span> <span class="nf">feed</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_bytes</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Feed a new set of bytes into the protocol handler</span>
+
+<span class="sd">        These bytes will be immediately fed into the parsing state machine and</span>
+<span class="sd">        if new packets are found, the ``packet_callback`` will be executed</span>
+<span class="sd">        with the fully-formed message.</span>
+
+<span class="sd">        :param new_bytes: The new bytes to be fed into the stream protocol</span>
+<span class="sd">            handler.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_available_bytes</span> <span class="o">+=</span> <span class="n">new_bytes</span>
+        <span class="n">callbacks</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">while</span> <span class="bp">True</span><span class="p">:</span>
+                <span class="n">packet</span> <span class="o">=</span> <span class="n">six</span><span class="o">.</span><span class="n">next</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_packet_generator</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">packet</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+                    <span class="k">break</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">callbacks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">packet_callback</span><span class="p">,</span> <span class="n">packet</span><span class="p">))</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="c"># When we receive an exception, we assume that the _available_bytes</span>
+            <span class="c"># has already been updated and we just choked on a field.  That</span>
+            <span class="c"># is, unless the number of _available_bytes has not changed.  In</span>
+            <span class="c"># that case, we reset the buffered entirely</span>
+
+            <span class="c"># TODO: black hole may not be the best.  What should the logging</span>
+            <span class="c"># behavior be?</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+
+        <span class="c"># callbacks are partials that are boudn to packet already.  We do</span>
+        <span class="c"># this in order to separate out parsing activity (and error handling)</span>
+        <span class="c"># from the execution of callbacks.  Callbacks should not in any way</span>
+        <span class="c"># rely on the parsers position in the byte stream.</span>
+        <span class="k">for</span> <span class="n">callback</span> <span class="ow">in</span> <span class="n">callbacks</span><span class="p">:</span>
+            <span class="n">callback</span><span class="p">()</span>
+</div>
+<div class="viewcode-block" id="StreamProtocolHandler.reset"><a class="viewcode-back" href="../../api.html#suitcase.protocol.StreamProtocolHandler.reset">[docs]</a>    <span class="k">def</span> <span class="nf">reset</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Reset the internal state machine to a fresh state</span>
+
+<span class="sd">        If the protocol in use does not properly handle cases of possible</span>
+<span class="sd">        desycnronization it might be necessary to issue a reset if bytes</span>
+<span class="sd">        are being received but no packets are coming out of the state</span>
+<span class="sd">        machine.  A reset is issue internally whenever an unexpected exception</span>
+<span class="sd">        is encountered while processing bytes from the stream.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_packet_generator</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_packet_generator</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_available_bytes</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&quot;</span></div></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2015, Digi International, Inc..
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.6</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
