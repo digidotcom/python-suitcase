@@ -182,13 +182,6 @@ class TestSuperField(unittest.TestCase):
         sm = self._create_supermessage()
         sm.ubint8 = 0xFFFF  # too big
         self.assertRaises(SuitcasePackStructException, sm.pack)
-        try:
-            sm.pack()
-        except SuitcasePackStructException as e:
-            self.assertEqual(str(e), 'ubyte format requires 0 <= number <= 255')
-            self.assertEqual(repr(e), "error('ubyte format requires 0 <= number <= 255',)")
-        else:
-            self.fail("SuitcasePackStructException not raised")
 
     def test_other_pack_exception(self):
         sm = self._create_supermessage()
