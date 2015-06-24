@@ -16,7 +16,7 @@ and
 [Sqlalchemy's Declarative Syntax](http://docs.sqlalchemy.org/en/latest/orm/tutorial.html#declare-a-mapping)
 do for Database ORMs and adopts a similar, class-based syntax.
 
-[View the Full Documentation](https://digidotcom.github.io/pythyon-suitcase)
+[View the Full Documentation](https://digidotcom.github.io/python-suitcase)
 
 Example
 =======
@@ -87,7 +87,7 @@ get objects that you can do with as you please.
 
 For more information, including how to use the structures that you
 have described, please refer to the
-[Full Documentation](https://digidotcom.github.io/pythyon-suitcase).
+[Full Documentation](https://digidotcom.github.io/python-suitcase).
 
 Design Goals
 ============
