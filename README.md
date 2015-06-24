@@ -16,6 +16,8 @@ and
 [Sqlalchemy's Declarative Syntax](http://docs.sqlalchemy.org/en/latest/orm/tutorial.html#declare-a-mapping)
 do for Database ORMs and adopts a similar, class-based syntax.
 
+[View the Full Documentation](https://digidotcom.github.io/pythyon-suitcase)
+
 Example
 =======
 
@@ -83,6 +85,10 @@ From these declarative definitions, you can both create message
 instances and pack them or parse bytes (including stream parsing) to
 get objects that you can do with as you please.
 
+For more information, including how to use the structures that you
+have described, please refer to the
+[Full Documentation](https://digidotcom.github.io/pythyon-suitcase).
+
 Design Goals
 ============
 
@@ -123,7 +129,7 @@ The library seeks to adhere to these core principles:
   the hope would be that one would not need to start from scratch.
 
 License
--------
+=======
 
 This software is open-source software. Copyright Digi International, 2015.
 
