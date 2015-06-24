@@ -1,6 +1,12 @@
 Suitcase
 ========
 
+[![Build Status](https://img.shields.io/travis/digidotcom/python-suitcase.svg)](https://travis-ci.org/digidotcom/python-suitcase)
+[![Coverage Status](https://img.shields.io/coveralls/digidotcom/python-suitcase.svg)](https://coveralls.io/r/digidotcom/python-suitcase)
+[![Code Climate](https://img.shields.io/codeclimate/github/digidotcom/python-suitcase.svg)](https://codeclimate.com/github/digidotcom/python-suitcase)
+[![Latest Version](https://img.shields.io/pypi/v/suitcase.svg)](https://pypi.python.org/pypi/suitcase/)
+[![License](https://img.shields.io/badge/license-MPL%202.0-blue.svg)](https://github.com/digidotcom/python-suitcase/blob/master/LICENSE.txt)
+
 Suitcase is a library providing a set of primitives and helpers for
 specifying and parsing protocols.  Suitcase provides an internal DSL
 (Domain Specific Language) for describing protocol frames.  It seeks
