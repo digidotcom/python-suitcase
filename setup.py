@@ -41,9 +41,23 @@ def get_long_description():
 setup(
     name='suitcase',
     version='0.6',
+    url="https://github.com/digidotcom/python-suitcase",
     description='A library for specifying/parsing/packing binary protocols',
     long_description=get_long_description(),
     author="Paul Osborne",
     author_email="paul.osborne@digi.com",
     packages=find_packages(),
+    keywords = ("suitcase, construct, declarative, dsl, protocol,"
+                "binary, parser, builder, pack, unpack"),
+    classifiers=[
+        "Development Status :: 3 - Alpha",
+        "Intended Audience :: Developers",
+        "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
+        "Programming Language :: Python :: 2.7",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.2",
+        "Programming Language :: Python :: 3.3",
+        "Programming Language :: Python :: 3.4",
+        "Topic :: Software Development :: Libraries",
+    ],
 )
