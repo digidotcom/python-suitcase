@@ -18,6 +18,12 @@ do for Database ORMs and adopts a similar, class-based syntax.
 
 [View the Full Documentation](https://digidotcom.github.io/python-suitcase)
 
+The original version of suitcase was generously contributed by the
+[Digi](http://www.digi.com/)
+[Wireless Design Services](http://www.digi.com/wireless-design-services/).
+The software is provided as Alpha software and has not undergone
+formal testing but does ship with extensive unit testing.
+
 Example
 =======
 
