@@ -14,7 +14,6 @@ do for Database ORMs and adopts a similar, class-based syntax.
 .. toctree::
    :maxdepth: 2
 
-   examples
    api
 
 Example: Packetized TCP Server and Client
