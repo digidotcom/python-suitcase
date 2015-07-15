@@ -34,7 +34,7 @@ of the core network protocols that form the backbone of the internet:
 from suitcase.fields import UBInt16, Payload, LengthField, Magic, \
     UBInt8Sequence, DispatchField, DispatchTarget, UBInt8, UBInt32, BitField, BitNum, \
     BitBool
-from suitcase.struct import Structure
+from suitcase.structure import Structure
 
 
 class TCPFrameHeader(Structure):
