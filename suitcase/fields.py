@@ -80,7 +80,7 @@ class BaseField(object):
         return self._parent.lookup_field_by_placeholder(placeholder)
 
     def __repr__(self):
-        return repr(self._value)
+        return repr(self.getval())
 
     def getval(self):
         return self._value
