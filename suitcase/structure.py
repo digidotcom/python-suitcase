@@ -57,7 +57,13 @@ class Packer(object):
                 stream.write(checksum_data)
 
     def unpack(self, data):
-        self.unpack_stream(BytesIO(data))
+        stream = BytesIO(data)
+        self.unpack_stream(stream)
+        stream.tell()
+        if stream.tell() != len(data):
+            raise SuitcaseParseError("Structure fully parsed but additional bytes remained.  Parsing "
+                                     "consumed %d of %d bytes" %
+                                     (stream.tell(), len(data)))
 
     def unpack_stream(self, stream):
         """Unpack bytes from a stream of data field-by-field
@@ -226,10 +232,7 @@ class Structure(object):
 
         """
         m = cls()
-        try:
-            m.unpack(data)
-        except:
-            raise
+        m.unpack(data)
         return m
 
     def __init__(self):

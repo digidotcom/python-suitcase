@@ -287,7 +287,7 @@ class DispatchField(BaseField):
 
         class MyMessage(Structure):
             type = DispatchField(UBInt8())
-            body = DispatchTarget(dispatch_field = type, dispatch_mapping={
+            body = DispatchTarget(dispatch_field=type, dispatch_mapping={
                 0x00: MessageType0,
                 0x01: MessageType1,
             })
@@ -329,7 +329,7 @@ class DispatchTarget(BaseField):
 
         class MyMessage(Structure):
             type = DispatchField(UBInt8())
-            body = DispatchTarget(dispatch_field = type, dispatch_mapping={
+            body = DispatchTarget(dispatch_field=type, dispatch_mapping={
                 0x00: MessageType0,
                 0x01: MessageType1,
             })
@@ -347,13 +347,15 @@ class DispatchTarget(BaseField):
     def __init__(self, length_provider, dispatch_field,
                  dispatch_mapping, **kwargs):
         BaseField.__init__(self, **kwargs)
-        self.length_provider = self._ph2f(length_provider)
+        if length_provider is None:
+            self.length_provider = None
+        else:
+            self.length_provider = self._ph2f(length_provider)
+            self.length_provider.associate_length_consumer(self)
         self.dispatch_field = self._ph2f(dispatch_field)
         self.dispatch_mapping = dispatch_mapping
         self.inverse_dispatch_mapping = dict((v, k) for (k, v)
                                              in dispatch_mapping.items())
-
-        self.length_provider.associate_length_consumer(self)
 
     def _lookup_msg_type(self):
         target_key = self.dispatch_field.getval()
@@ -365,7 +367,10 @@ class DispatchTarget(BaseField):
 
     @property
     def bytes_required(self):
-        return self.length_provider.getval()
+        if self.length_provider is None:
+            return None
+        else:
+            return self.length_provider.getval()
 
     def getval(self):
         return self._value
@@ -388,8 +393,6 @@ class DispatchTarget(BaseField):
         return self._value._packer.write(stream)
 
     def unpack(self, data):
-        assert len(data) == self.bytes_required
-
         target_msg_type = self._lookup_msg_type()
         if target_msg_type is None:
             target_msg_type = self.dispatch_mapping.get(None)

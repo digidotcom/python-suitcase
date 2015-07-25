@@ -332,6 +332,14 @@ class MyOtherTargetMessage(Structure):
     sequence = UBInt8Sequence(_length)
 
 
+class MySimpleFixedPayload(Structure):
+    number = UBInt32()
+
+
+class MyPayloadMessage(Structure):
+    payload = Payload()
+
+
 class MyDefaultTargetMessage(Structure):
     _length = LengthField(DependentField('length'))
     sequence = UBInt8Sequence(_length)
@@ -345,6 +353,15 @@ class MyBasicDispatchMessage(Structure):
         0x01: MyOtherTargetMessage,
         None: MyDefaultTargetMessage
     })
+
+
+class MyDynamicLengthDispatchMessage(Structure):
+    type = DispatchField(UBInt8())
+    body = DispatchTarget(None, type, {
+        0x1F: MySimpleFixedPayload,
+        0xCC: MyPayloadMessage,
+    })
+    eof = Magic(b'EOF')
 
 
 class BasicGreedy(Structure):
@@ -471,6 +488,36 @@ class TestMessageDispatching(unittest.TestCase):
         self.assert_(isinstance(msg.body, MyDefaultTargetMessage))
 
 
+class TestMessageDispatchingVariableLength(unittest.TestCase):
+
+    def test_fixed_field_dispatch_packing(self):
+        msg = MyDynamicLengthDispatchMessage()
+        target_msg = MySimpleFixedPayload()
+        target_msg.number = 0xFFEEFFEE
+        msg.body = target_msg
+        self.assertEqual(msg.pack(), b"\x1f\xff\xee\xff\xeeEOF")
+
+    def test_variable_field_dispatch_packing(self):
+        msg = MyDynamicLengthDispatchMessage()
+        target_msg = MyPayloadMessage()
+        target_msg.payload = b"~~~I'M SO DYNAMIC~~~"
+        msg.body = target_msg
+        self.assertEqual(msg.pack(), b"\xcc~~~I'M SO DYNAMIC~~~EOF")
+
+    def test_dispatch_unpacking_fixed(self):
+        msg = MyDynamicLengthDispatchMessage.from_data(b"\x1f\xff\xee\xff\xeeEOF")
+        self.assertEqual(msg.body.number, 0xFFEEFFEE)
+
+    def test_dispatch_unpacking_variable(self):
+        msg = MyDynamicLengthDispatchMessage.from_data(b"\xcc~~~I'M SO DYNAMIC~~~EOF")
+        self.assertEqual(msg.body.payload, b"~~~I'M SO DYNAMIC~~~")
+
+    def test_dispatch_unpacking_fixed_bad_length(self):
+        # too many bytes before EOF
+        self.assertRaises(SuitcaseParseError, MyDynamicLengthDispatchMessage.from_data,
+                          b"\x1f\xff\xee\xff\xeeEXTRA_EOF")
+
+
 class TestBitFields(unittest.TestCase):
     def test_packing(self):
         field_proto = BitField(16,
@@ -550,6 +597,15 @@ class TestConditionalField(unittest.TestCase):
         m2.unpack(b'\xff\x1f')
         self.assertEqual(m2.f1, 0xff)
         self.assertEqual(m2.f2, 0x1f)
+
+
+class TestStructure(unittest.TestCase):
+
+    def test_unpack_fewer_bytes_than_required(self):
+        self.assertRaises(SuitcaseParseError, MySimpleFixedPayload.from_data, b'123')
+
+    def test_unpack_more_bytes_than_required(self):
+        self.assertRaises(SuitcaseParseError, MySimpleFixedPayload.from_data, b'12345')
 
 
 if __name__ == "__main__":
