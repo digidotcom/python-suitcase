@@ -576,6 +576,14 @@ class Conditional(Structure):
     f2 = ConditionalField(UBInt8(), lambda m: m.f1 == 255)
 
 
+# message where f2 and f3 are only defined if f2 is 255,
+# and f2 specifies a length for f3
+class ConditionalLength(Structure):
+    f1 = UBInt8()
+    f2 = ConditionalField(LengthField(UBInt8()), lambda m: m.f1 == 255)
+    f3 = ConditionalField(Payload(length_provider=f2), lambda m: m.f1 == 255)
+
+
 class TestConditionalField(unittest.TestCase):
     def test_conditional_pack(self):
         m1 = Conditional()
@@ -597,6 +605,29 @@ class TestConditionalField(unittest.TestCase):
         m2.unpack(b'\xff\x1f')
         self.assertEqual(m2.f1, 0xff)
         self.assertEqual(m2.f2, 0x1f)
+
+    def test_conditional_length_pack(self):
+        m1 = ConditionalLength()
+        m1.f1 = 0x91
+        self.assertEqual(m1.pack(), b'\x91')
+
+        m2 = ConditionalLength()
+        m2.f1 = 0xFF
+        m2.f3 = b'\x01\x02\x03\x04\x05'
+        self.assertEqual(m2.pack(), b'\xff\x05\x01\x02\x03\x04\x05')
+
+    def test_conditional_length_unpack(self):
+        m1 = ConditionalLength()
+        m1.unpack(b'\x91')
+        self.assertEqual(m1.f1, 0x91)
+        self.assertEqual(m1.f2, None)
+        self.assertEqual(m1.f3, None)
+
+        m2 = ConditionalLength()
+        m2.unpack(b'\xff\x05\x01\x02\x03\x04\x05')
+        self.assertEqual(m2.f1, 0xff)
+        self.assertEqual(m2.f2, 0x05)
+        self.assertEqual(m2.f3, b'\x01\x02\x03\x04\x05')
 
 
 class TestStructure(unittest.TestCase):

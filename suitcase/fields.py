@@ -520,6 +520,12 @@ class ConditionalField(BaseField):
     def setval(self, value):
         return self.field.setval(value)
 
+    def associate_length_consumer(self, target_field):
+        self.field.associate_length_consumer(target_field)
+
+    def get_adjusted_length(self):
+        return self.field.get_adjusted_length()
+
 
 class Payload(BaseField):
     """Variable length raw (byte string) field
