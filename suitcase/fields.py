@@ -370,7 +370,7 @@ class DispatchTarget(BaseField):
         if self.length_provider is None:
             return None
         else:
-            return self.length_provider.getval()
+            return self.length_provider.get_adjusted_length()
 
     def getval(self):
         return self._value
@@ -578,7 +578,7 @@ class BaseVariableByteSequence(BaseField):
 
     @property
     def bytes_required(self):
-        return self.length_provider.getval()
+        return self.length_provider.get_adjusted_length()
 
     def pack(self, stream):
         sfmt = self.make_format(len(self._value))
