@@ -40,7 +40,7 @@ class StreamProtocolHandler(object):
             payload = VariableRawPayload(length)
 
         def packet_received(packet):
-            print packet
+            print(packet)
 
         def run_forever(host, port):
             protocol_handler = StreamProtocolHandler(SimpleFramedMessage,
@@ -51,7 +51,7 @@ class StreamProtocolHandler(object):
             while True:
                 bytes = sock.recv(1024)
                 if len(bytes) == 0:
-                    print "Socket closed... exiting"
+                    print("Socket closed... exiting")
                     return
                 else:
                     protocol_handler.feed(bytes)

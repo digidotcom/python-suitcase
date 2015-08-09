@@ -186,12 +186,13 @@ class Structure(object):
     Datagram::
 
 
-        class UDPDatagram(Structure):
-            source_port = UBInt16()
-            destination_port = UBInt16()
-            length = LengthField(UBInt16())
-            checksum = UBInt16()
-            data = VariableRawPayload(length)
+        >>> from suitcase.fields import UBInt16, LengthField, VariableRawPayload
+        >>> class UDPDatagram(Structure):
+        ...     source_port = UBInt16()
+        ...     destination_port = UBInt16()
+        ...     length = LengthField(UBInt16())
+        ...     checksum = UBInt16()
+        ...     data = VariableRawPayload(length)
 
     From this we have a near-ideal form for packing and parsing packet
     data following the schema::
@@ -200,12 +201,12 @@ class Structure(object):
         >>> dgram.source_port = 9110
         >>> dgram.destination_port = 1001
         >>> dgram.checksum = 27193
-        >>> dgram.data = "Hello, world!"
+        >>> dgram.data = b"Hello, world!"
         >>> dgram.pack()
         '#\x96\x03\xe9\x00\rj9Hello, world!'
         >>> dgram2 = UDPDatagram()
         >>> dgram2.unpack(dgram.pack())
-        >>> print dgram2
+        >>> print(dgram2)
         UDPDatagram (
           source_port=9110,
           destination_port=1001,

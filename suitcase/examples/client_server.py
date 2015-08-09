@@ -6,7 +6,7 @@
 import sys
 import socket
 
-import SocketServer
+from six.moves import socketserver
 from suitcase.protocol import StreamProtocolHandler
 from suitcase.structure import Structure
 from suitcase.fields import UBInt16, LengthField, Payload, UBInt8
@@ -21,7 +21,7 @@ class EchoProtocolFrame(Structure):
     payload = Payload(payload_length)
 
 
-class EchoTCPHandler(SocketServer.BaseRequestHandler):
+class EchoTCPHandler(socketserver.BaseRequestHandler):
     def _frame_received(self, request_frame):
         # frame is an instance of EchoProtocolFrame
         print("Received %r" % request_frame)
@@ -66,5 +66,5 @@ if __name__ == '__main__':
     if sys.argv[1] == '-c':
         client()
     elif sys.argv[1] == '-s':
-        server = SocketServer.TCPServer(('0.0.0.0', 7070), EchoTCPHandler)
+        server = socketserver.TCPServer(('0.0.0.0', 7070), EchoTCPHandler)
         server.serve_forever()

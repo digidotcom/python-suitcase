@@ -62,6 +62,6 @@ m.total_questions = 1
 m.total_answers_rrs = 0
 m.total_authority_rrs = 0
 m.total_additional_rrs = 0
-m.data = "docs.digi.com\x00\x00\x00\x00"
+m.data = b"docs.digi.com\x00\x00\x00\x00"
 
 print(repr(m.pack()))
