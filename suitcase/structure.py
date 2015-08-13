@@ -197,22 +197,25 @@ class Structure(object):
     From this we have a near-ideal form for packing and parsing packet
     data following the schema::
 
+        >>> def printb(s):
+        ...     print(repr(s).replace("b'", "'").replace("u'", "'"))
+        ...
         >>> dgram = UDPDatagram()
         >>> dgram.source_port = 9110
         >>> dgram.destination_port = 1001
         >>> dgram.checksum = 27193
         >>> dgram.data = b"Hello, world!"
-        >>> dgram.pack()
+        >>> printb(dgram.pack())
         '#\x96\x03\xe9\x00\rj9Hello, world!'
         >>> dgram2 = UDPDatagram()
         >>> dgram2.unpack(dgram.pack())
-        >>> print(dgram2)
+        >>> dgram2
         UDPDatagram (
           source_port=9110,
           destination_port=1001,
           length=13,
           checksum=27193,
-          data='Hello, world!',
+          data=...'Hello, world!',
         )
 
     """
