@@ -11,10 +11,12 @@ from suitcase.crc import crc16_ccitt, crc32
 from suitcase.exceptions import SuitcaseProgrammingError, SuitcasePackStructException, SuitcasePackException, \
     SuitcaseParseError
 from suitcase.fields import DependentField, LengthField, VariableRawPayload, \
-    Magic, BitField, BitBool, BitNum, UBInt8, UBInt16, UBInt24, UBInt32, UBInt64, \
-    SBInt8, SBInt16, SBInt32, SBInt64, ULInt8, ULInt16, ULInt32, ULInt64, SLInt8, \
-    SLInt16, SLInt32, SLInt64, ConditionalField, UBInt8Sequence, SBInt8Sequence, \
-    FieldProperty, DispatchField, DispatchTarget, CRCField, Payload
+    Magic, BitField, BitBool, BitNum, DispatchTarget, CRCField, Payload, \
+    UBInt8, UBInt16, UBInt24, UBInt32, UBInt40, UBInt48, UBInt56, UBInt64, \
+    SBInt8, SBInt16, SBInt24, SBInt32, SBInt40, SBInt48, SBInt56, SBInt64, \
+    ULInt8, ULInt16, ULInt24, ULInt32, ULInt40, ULInt48, ULInt56, ULInt64, \
+    SLInt8, SLInt16, SLInt24, SLInt32, SLInt40, SLInt48, SLInt56, SLInt64, \
+    ConditionalField, UBInt8Sequence, SBInt8Sequence, FieldProperty, DispatchField
 from suitcase.structure import Structure
 import struct
 
@@ -46,24 +48,39 @@ class SuperMessage(Structure):
     ubint16 = UBInt16()
     ubint24 = UBInt24()
     ubint32 = UBInt32()
+    ubint40 = UBInt40()
+    ubint48 = UBInt48()
+    ubint56 = UBInt56()
     ubint64 = UBInt64()
 
     # signed big endian
     sbint8 = SBInt8()
     sbint16 = SBInt16()
+    sbint24 = SBInt24()
     sbint32 = SBInt32()
+    sbint40 = SBInt40()
+    sbint48 = SBInt48()
+    sbint56 = SBInt56()
     sbint64 = SBInt64()
 
     # unsigned little endian
     ulint8 = ULInt8()
     ulint16 = ULInt16()
+    ulint24 = ULInt24()
     ulint32 = ULInt32()
+    ulint40 = ULInt40()
+    ulint48 = ULInt48()
+    ulint56 = ULInt56()
     ulint64 = ULInt64()
 
     # signed little endian
     slint8 = SLInt8()
     slint16 = SLInt16()
+    slint24 = SLInt24()
     slint32 = SLInt32()
+    slint40 = SLInt40()
+    slint48 = SLInt48()
+    slint56 = SLInt56()
     slint64 = SLInt64()
 
     # optional
@@ -118,25 +135,40 @@ class TestSuperField(unittest.TestCase):
         s.ubint16 = 0xAABB
         s.ubint24 = 0xAABBCC
         s.ubint32 = 0xAABBCCDD
+        s.ubint40 = 0xAABBCCDDEE
+        s.ubint48 = 0xAABBCCDDEEFF
+        s.ubint56 = 0xAABBCCDDEEFF00
         s.ubint64 = 0xAABBCCDDEEFF0011
 
-        s.sbint8 = -25
-        s.sbint16 = -312
-        s.sbint32 = -9570
-        s.sbint64 = -29349579
+        s.sbint8 = -100
+        s.sbint16 = -1000
+        s.sbint24 = -100000
+        s.sbint32 = -100000000
+        s.sbint40 = -10000000000
+        s.sbint48 = -10000000000000
+        s.sbint56 = -1000000000000000
+        s.sbint64 = -100000000000000000
 
         s.ulint8 = 0xAA
         s.ulint16 = 0xAABB
         s.ulint16_byte_string = b'\xAA\xBB'
         s.ulint16_value = 0xBBAA
 
+        s.ulint24 = 0xAABBCC
         s.ulint32 = 0xAABBCCDD
+        s.ulint40 = 0xAABBCCDDEE
+        s.ulint48 = 0xAABBCCDDEEFF
+        s.ulint56 = 0xAABBCCDDEEFF00
         s.ulint64 = 0xAABBCCDDEEFF0011
 
-        s.slint8 = -25
-        s.slint16 = -312
-        s.slint32 = -9570
-        s.slint64 = -29349579
+        s.slint8 = -100
+        s.slint16 = -1000
+        s.slint24 = -100000
+        s.slint32 = -100000000
+        s.slint40 = -10000000000
+        s.slint48 = -10000000000000
+        s.slint56 = -1000000000000000
+        s.slint64 = -100000000000000000
 
         s.optional_one = 1
         s.optional_two = 2

@@ -3,11 +3,11 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #
 # Copyright (c) 2015 Digi International Inc. All Rights Reserved.
-import six
+import struct
 
+import six
 from suitcase.exceptions import SuitcaseChecksumException, SuitcaseProgrammingError, \
     SuitcaseParseError, SuitcaseException, SuitcasePackStructException
-import struct
 from six import BytesIO, StringIO
 
 
@@ -697,7 +697,7 @@ class BaseStructField(BaseField):
     """Base for fields based very directly on python struct module formats
 
     It is expected that this class will be subclassed and customized by
-    definining ``FORMAT`` at the class level.  ``FORMAT`` is expected to
+    defining ``FORMAT`` at the class level.  ``FORMAT`` is expected to
     be a format string that could be used with struct.pack/unpack.  It
     should include endianess information.  If the ``FORMAT`` includes
     multiple elements, the default ``_unpack`` logic assumes that each
@@ -719,7 +719,13 @@ class BaseStructField(BaseField):
         try:
             keep_bytes = getattr(self, 'KEEP_BYTES', None)
             if keep_bytes is not None:
-                to_write = struct.pack(self.PACK_FORMAT, self._value)[-keep_bytes:]
+                if self.PACK_FORMAT[0] == "<":
+                    to_write = struct.pack(self.PACK_FORMAT, self._value)[:keep_bytes]
+                elif self.PACK_FORMAT[0] == ">":
+                    to_write = struct.pack(self.PACK_FORMAT, self._value)[-keep_bytes:]
+                else:
+                    raise SuitcaseProgrammingError("When specifying KEEP_BYTES, \
+                    PACK_FORMAT must start with `>` or `<`")
             else:
                 to_write = struct.pack(self.PACK_FORMAT, self._value)
         except struct.error as e:
@@ -728,8 +734,14 @@ class BaseStructField(BaseField):
 
     def unpack(self, data):
         value = 0
-        for i, byte in enumerate(reversed(struct.unpack(self.UNPACK_FORMAT, data))):
-            value |= (byte << (i * 8))
+        if self.UNPACK_FORMAT[0] == "<":
+            for i, byte in enumerate(struct.unpack(self.UNPACK_FORMAT, data)):
+                value |= (byte << (i * 8))
+        elif self.UNPACK_FORMAT[0] == ">":
+            for i, byte in enumerate(reversed(struct.unpack(self.UNPACK_FORMAT, data))):
+                value |= (byte << (i * 8))
+        else:
+            raise SuitcaseProgrammingError("UNPACK_FORMAT must start with `>` or `<`")
         self._value = value
 
 
@@ -758,6 +770,27 @@ class UBInt32(BaseStructField):
     PACK_FORMAT = UNPACK_FORMAT = b">I"
 
 
+class UBInt40(BaseStructField):
+    """Unsigned Big Endian 40-bit integer field"""
+    KEEP_BYTES = 5
+    PACK_FORMAT = b">Q"
+    UNPACK_FORMAT = b">BBBBB"
+
+
+class UBInt48(BaseStructField):
+    """Unsigned Big Endian 48-bit integer field"""
+    KEEP_BYTES = 6
+    PACK_FORMAT = b">Q"
+    UNPACK_FORMAT = b">BBBBBB"
+
+
+class UBInt56(BaseStructField):
+    """Unsigned Big Endian 56-bit integer field"""
+    KEEP_BYTES = 7
+    PACK_FORMAT = b">Q"
+    UNPACK_FORMAT = b">BBBBBBB"
+
+
 class UBInt64(BaseStructField):
     """Unsigned Big Endian 64-bit integer field"""
     PACK_FORMAT = UNPACK_FORMAT = b">Q"
@@ -776,9 +809,37 @@ class SBInt16(BaseStructField):
     PACK_FORMAT = UNPACK_FORMAT = b">h"
 
 
+class SBInt24(BaseStructField):
+    """Signed Big Endian 24-bit integer field"""
+    KEEP_BYTES = 3
+    PACK_FORMAT = b">i"
+    UNPACK_FORMAT = b">bBB"
+
+
 class SBInt32(BaseStructField):
     """Signed Big Endian 32-bit integer field"""
     PACK_FORMAT = UNPACK_FORMAT = b">i"
+
+
+class SBInt40(BaseStructField):
+    """Signed Big Endian 40-bit integer field"""
+    KEEP_BYTES = 5
+    PACK_FORMAT = b">q"
+    UNPACK_FORMAT = b">bBBBB"
+
+
+class SBInt48(BaseStructField):
+    """Signed Big Endian 48-bit integer field"""
+    KEEP_BYTES = 6
+    PACK_FORMAT = b">q"
+    UNPACK_FORMAT = b">bBBBBB"
+
+
+class SBInt56(BaseStructField):
+    """Signed Big Endian 56-bit integer field"""
+    KEEP_BYTES = 7
+    PACK_FORMAT = b">q"
+    UNPACK_FORMAT = b">bBBBBBB"
 
 
 class SBInt64(BaseStructField):
@@ -799,9 +860,37 @@ class ULInt16(BaseStructField):
     PACK_FORMAT = UNPACK_FORMAT = b"<H"
 
 
+class ULInt24(BaseStructField):
+    """Unsigned Little Endian 24-bit integer field"""
+    KEEP_BYTES = 3
+    PACK_FORMAT = b"<I"
+    UNPACK_FORMAT = b"<BBB"
+
+
 class ULInt32(BaseStructField):
     """Unsigned Little Endian 32-bit integer field"""
     PACK_FORMAT = UNPACK_FORMAT = b"<I"
+
+
+class ULInt40(BaseStructField):
+    """Unsigned Little Endian 40-bit integer field"""
+    KEEP_BYTES = 5
+    PACK_FORMAT = b"<Q"
+    UNPACK_FORMAT = b"<BBBBB"
+
+
+class ULInt48(BaseStructField):
+    """Unsigned Little Endian 48-bit integer field"""
+    KEEP_BYTES = 6
+    PACK_FORMAT = b"<Q"
+    UNPACK_FORMAT = b"<BBBBBB"
+
+
+class ULInt56(BaseStructField):
+    """Unsigned Little Endian 56-bit integer field"""
+    KEEP_BYTES = 7
+    PACK_FORMAT = b"<Q"
+    UNPACK_FORMAT = b"<BBBBBBB"
 
 
 class ULInt64(BaseStructField):
@@ -822,9 +911,37 @@ class SLInt16(BaseStructField):
     PACK_FORMAT = UNPACK_FORMAT = b"<h"
 
 
+class SLInt24(BaseStructField):
+    """Signed Little Endian 24-bit integer field"""
+    KEEP_BYTES = 3
+    PACK_FORMAT = b"<i"
+    UNPACK_FORMAT = b"<BBb"
+
+
 class SLInt32(BaseStructField):
     """Signed Little Endian 32-bit integer field"""
     PACK_FORMAT = UNPACK_FORMAT = b"<i"
+
+
+class SLInt40(BaseStructField):
+    """Signed Little Endian 40-bit integer field"""
+    KEEP_BYTES = 5
+    PACK_FORMAT = b"<q"
+    UNPACK_FORMAT = b"<BBBBb"
+
+
+class SLInt48(BaseStructField):
+    """Signed Little Endian 48-bit integer field"""
+    KEEP_BYTES = 6
+    PACK_FORMAT = b"<q"
+    UNPACK_FORMAT = b"<BBBBBb"
+
+
+class SLInt56(BaseStructField):
+    """Signed Little Endian 56-bit integer field"""
+    KEEP_BYTES = 7
+    PACK_FORMAT = b"<q"
+    UNPACK_FORMAT = b"<BBBBBBb"
 
 
 class SLInt64(BaseStructField):
@@ -976,6 +1093,9 @@ class BitField(BaseField):
                 2: UBInt16,
                 3: UBInt24,
                 4: UBInt32,
+                5: UBInt40,
+                6: UBInt48,
+                7: UBInt56,
                 8: UBInt64,
             }[self.number_bytes]()
         self._field = field.create_instance(self._parent)
