@@ -1,0 +1,193 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Examples &mdash; suitcase 0.6 documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="suitcase 0.6 documentation" href="index.html" />
+    <link rel="next" title="API Documentation" href="api.html" />
+    <link rel="prev" title="Getting Started" href="getting_started.html" />
+   
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+
+  </head>
+  <body role="document">  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="examples">
+<h1>Examples<a class="headerlink" href="#examples" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="packetized-tcp-server-and-client">
+<h2>Packetized TCP Server and Client<a class="headerlink" href="#packetized-tcp-server-and-client" title="Permalink to this headline">¶</a></h2>
+<p>The following example shows an example of a protocol on TCP which has
+a length field and a payload of <code class="docutils literal"><span class="pre">length</span></code> bytes.  With suitcase, we
+only need to declare the basic structure of the message and we get a
+packer and a stream protocol handler out of the library with very
+little effort.</p>
+<p>Since the protocol definition is declarative, it is easy to see what
+the structure of packets is.   The definition of the protocol is
+shared between the client and the server.  For the server portion,
+we can use <code class="docutils literal"><span class="pre">SocketServer</span></code> from the standard library in order to
+accept connections.  <code class="docutils literal"><span class="pre">Suitcase</span></code> has no special support for any
+networking libraries, so you are free to use it with other network
+libraries like twisted, gevent, etc. as you please.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">socket</span>
+
+<span class="kn">import</span> <span class="nn">SocketServer</span>
+<span class="kn">from</span> <span class="nn">suitcase.protocol</span> <span class="kn">import</span> <span class="n">StreamProtocolHandler</span>
+<span class="kn">from</span> <span class="nn">suitcase.structure</span> <span class="kn">import</span> <span class="n">Structure</span>
+<span class="kn">from</span> <span class="nn">suitcase.fields</span> <span class="kn">import</span> <span class="n">UBInt16</span><span class="p">,</span> <span class="n">LengthField</span><span class="p">,</span> <span class="n">Payload</span><span class="p">,</span> <span class="n">UBInt8</span>
+
+<span class="n">FRAME_TYPE_ECHO_REQUEST</span> <span class="o">=</span> <span class="mh">0x00</span>
+<span class="n">FRAME_TYPE_ECHO_RESPONSE</span> <span class="o">=</span> <span class="mh">0x10</span>
+
+
+<span class="k">class</span> <span class="nc">EchoProtocolFrame</span><span class="p">(</span><span class="n">Structure</span><span class="p">):</span>
+    <span class="n">frame_type</span> <span class="o">=</span> <span class="n">UBInt8</span><span class="p">()</span>
+    <span class="n">payload_length</span> <span class="o">=</span> <span class="n">LengthField</span><span class="p">(</span><span class="n">UBInt16</span><span class="p">())</span>
+    <span class="n">payload</span> <span class="o">=</span> <span class="n">Payload</span><span class="p">(</span><span class="n">payload_length</span><span class="p">)</span>
+
+
+<span class="k">class</span> <span class="nc">EchoTCPHandler</span><span class="p">(</span><span class="n">SocketServer</span><span class="o">.</span><span class="n">BaseRequestHandler</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">_frame_received</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">request_frame</span><span class="p">):</span>
+        <span class="c"># frame is an instance of EchoProtocolFrame</span>
+        <span class="k">print</span><span class="p">(</span><span class="s">&quot;Received </span><span class="si">%r</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">request_frame</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">request_frame</span><span class="o">.</span><span class="n">frame_type</span> <span class="o">==</span> <span class="n">FRAME_TYPE_ECHO_REQUEST</span><span class="p">:</span>
+            <span class="n">response</span> <span class="o">=</span> <span class="n">EchoProtocolFrame</span><span class="p">()</span>
+            <span class="n">response</span><span class="o">.</span><span class="n">frame_type</span> <span class="o">=</span> <span class="n">FRAME_TYPE_ECHO_RESPONSE</span>
+            <span class="n">response</span><span class="o">.</span><span class="n">payload</span> <span class="o">=</span> <span class="s">&quot;You sent </span><span class="si">%r</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">request_frame</span><span class="o">.</span><span class="n">payload</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">request</span><span class="o">.</span><span class="n">sendall</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">pack</span><span class="p">())</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">print</span><span class="p">(</span><span class="s">&quot;Unexpected frame: </span><span class="si">%r</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">request_frame</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">setup</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">handler</span> <span class="o">=</span> <span class="n">StreamProtocolHandler</span><span class="p">(</span><span class="n">EchoProtocolFrame</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_frame_received</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">handle</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">while</span> <span class="bp">True</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">handler</span><span class="o">.</span><span class="n">feed</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">request</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="mi">1024</span><span class="p">))</span>
+
+
+<span class="k">def</span> <span class="nf">client</span><span class="p">():</span>
+    <span class="k">def</span> <span class="nf">message_received</span><span class="p">(</span><span class="n">frame</span><span class="p">):</span>
+        <span class="k">print</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
+
+    <span class="n">s</span> <span class="o">=</span> <span class="n">socket</span><span class="o">.</span><span class="n">socket</span><span class="p">()</span>
+    <span class="n">s</span><span class="o">.</span><span class="n">connect</span><span class="p">((</span><span class="s">&#39;127.0.0.1&#39;</span><span class="p">,</span> <span class="mi">7070</span><span class="p">))</span>
+    <span class="n">proto_handler</span> <span class="o">=</span> <span class="n">StreamProtocolHandler</span><span class="p">(</span><span class="n">EchoProtocolFrame</span><span class="p">,</span> <span class="n">message_received</span><span class="p">)</span>
+    <span class="k">while</span> <span class="bp">True</span><span class="p">:</span>
+        <span class="nb">input</span> <span class="o">=</span> <span class="nb">raw_input</span><span class="p">(</span><span class="s">&quot;Data to send: &quot;</span><span class="p">)</span>
+        <span class="n">request</span> <span class="o">=</span> <span class="n">EchoProtocolFrame</span><span class="p">()</span>
+        <span class="n">request</span><span class="o">.</span><span class="n">frame_type</span> <span class="o">=</span> <span class="n">FRAME_TYPE_ECHO_REQUEST</span>
+        <span class="n">request</span><span class="o">.</span><span class="n">payload</span> <span class="o">=</span> <span class="nb">input</span>
+        <span class="n">s</span><span class="o">.</span><span class="n">sendall</span><span class="p">(</span><span class="n">request</span><span class="o">.</span><span class="n">pack</span><span class="p">())</span>
+
+        <span class="c"># to handle asynchronous messages, this would be done asynchrnonously</span>
+        <span class="n">proto_handler</span><span class="o">.</span><span class="n">feed</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="mi">1024</span><span class="p">))</span>
+
+
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">print</span><span class="p">(</span><span class="s">&quot;Usage Client: </span><span class="si">%s</span><span class="s"> -c&quot;</span> <span class="o">%</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="k">print</span><span class="p">(</span><span class="s">&quot;Usage Server: </span><span class="si">%s</span><span class="s"> -s&quot;</span> <span class="o">%</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+    <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="s">&#39;-c&#39;</span><span class="p">:</span>
+        <span class="n">client</span><span class="p">()</span>
+    <span class="k">elif</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="s">&#39;-s&#39;</span><span class="p">:</span>
+        <span class="n">server</span> <span class="o">=</span> <span class="n">SocketServer</span><span class="o">.</span><span class="n">TCPServer</span><span class="p">((</span><span class="s">&#39;0.0.0.0&#39;</span><span class="p">,</span> <span class="mi">7070</span><span class="p">),</span> <span class="n">EchoTCPHandler</span><span class="p">)</span>
+        <span class="n">server</span><span class="o">.</span><span class="n">serve_forever</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">suitcase</a></h1>
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="getting_started.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="">Examples</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#packetized-tcp-server-and-client">Packetized TCP Server and Client</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+</ul>
+
+
+<hr />
+<ul>
+    
+    <li class="toctree-l1"><a href="http://www.digi.com/wireless-design-services/">Digi WDS</a></li>
+    
+    <li class="toctree-l1"><a href="https://github.com/digidotcom/python-suitcase">Suitcase on Github</a></li>
+    
+</ul>
+
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2015, Digi International, Inc..
+      
+      |
+      <a href="_sources/examples.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+    <a href="https://github.com/digidotcom/python-suitcase" class="github">
+        <img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub"  class="github"/>
+    </a>
+    
+
+    
+  </body>
+</html>
