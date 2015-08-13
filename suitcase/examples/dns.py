@@ -38,8 +38,8 @@ class DNSMessage(Structure):
 # Parsing Example (Line 40)
 #
 dns_request_hex = (
-    "28b30100000100000000000004646f63730464696769"
-    "03636f6d0000010001")
+    b"28b30100000100000000000004646f63730464696769"
+    b"03636f6d0000010001")
 dns_request_data = binascii.unhexlify(dns_request_hex)
 print(DNSMessage.from_data(dns_request_data))
 

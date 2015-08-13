@@ -6,11 +6,11 @@
 # testing using each of those interpreters.
 #
 
-pyversions=(2.7.7
-            3.2.5
+pyversions=(2.7.10
             3.3.5
             3.4.3
-            pypy-2.3.1)
+            pypy-2.6.0
+            pypy3-2.4.0)
 
 # parse options
 for i in "$@"
