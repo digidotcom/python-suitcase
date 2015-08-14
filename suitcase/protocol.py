@@ -78,8 +78,6 @@ class StreamProtocolHandler(object):
             for i, (_name, field) in enumerate(curmsg):
                 bytes_required = field.bytes_required
 
-                # if the first byte is magic, go with a scanning behavior
-                # where we just chop off one byte at a time
                 if i == 0 and isinstance(field, Magic):
                     magic_seq = field.getval()
                     while True:
@@ -89,7 +87,10 @@ class StreamProtocolHandler(object):
 
                         idx = self._available_bytes.find(magic_seq)
                         if idx == -1:  # no match in buffer
-                            self._available_bytes = b""
+                            # Since we know the entire magic_seq is not here, there can be at most
+                            # bytes_required - 1 bytes of the magic_seq available.  Thus we keep
+                            # that many bytes around in case it is the start of the magic field.
+                            self._available_bytes = self._available_bytes[-(bytes_required - 1):]
                             yield None
                         else:
                             self._available_bytes = self._available_bytes[idx:]

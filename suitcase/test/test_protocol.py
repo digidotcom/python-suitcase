@@ -17,6 +17,9 @@ class MagicSchema(Structure):
     magic = Magic(b'\xAA\xAA')
     value = SBInt64()
 
+class LongMagicSchema(Structure):
+    magic = Magic(b'\xAA\xAA\xBB\xBB')
+    value = SBInt64()
 
 class ErrorCaseSchema(Structure):
     type = DispatchField(UBInt8())
@@ -96,6 +99,44 @@ class TestStreamProtocol(unittest.TestCase):
         # garbage with our bytes in the middle
         test_bytes = b'\x1A\x3fadbsfkasdf;aslkfjasd;f' + pack + b'\x00\x00asdfn234r'
         protocol_handler.feed(test_bytes)
+        self.assertEqual(len(rx), 1)
+        self.assertEqual(rx[0].value, -29939)
+
+    def test_protocol_magic_scan_two_part(self):
+        rx = []
+
+        def cb(packet):
+            rx.append(packet)
+
+        protocol_handler = StreamProtocolHandler(MagicSchema, cb)
+        test_sequence = MagicSchema()
+        test_sequence.value = -29939
+        pack = test_sequence.pack()
+
+        # garbage with our bytes in the middle
+        test_bytes = b'\x1A\x3fadbsfkasdf;aslkfjasd;f' + pack[:1]
+        test_bytes2 = pack[1:] + b'\x00\x00asdfn234r'
+        protocol_handler.feed(test_bytes)
+        protocol_handler.feed(test_bytes2)
+        self.assertEqual(len(rx), 1)
+        self.assertEqual(rx[0].value, -29939)
+
+    def test_protocol_magic_scan_two_part_longer(self):
+        rx = []
+
+        def cb(packet):
+            rx.append(packet)
+
+        protocol_handler = StreamProtocolHandler(LongMagicSchema, cb)
+        test_sequence = LongMagicSchema()
+        test_sequence.value = -29939
+        pack = test_sequence.pack()
+
+        # garbage with our bytes in the middle
+        test_bytes = b'\x1A\x3fadbsfkasdf;aslkfjasd;f' + pack[:2]
+        test_bytes2 = pack[2:] + b'\x00\x00asdfn234r'
+        protocol_handler.feed(test_bytes)
+        protocol_handler.feed(test_bytes2)
         self.assertEqual(len(rx), 1)
         self.assertEqual(rx[0].value, -29939)
 
