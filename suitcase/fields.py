@@ -719,13 +719,10 @@ class BaseStructField(BaseField):
         try:
             keep_bytes = getattr(self, 'KEEP_BYTES', None)
             if keep_bytes is not None:
-                if self.PACK_FORMAT[0] == "<":
-                    to_write = struct.pack(self.PACK_FORMAT, self._value)[:keep_bytes]
-                elif self.PACK_FORMAT[0] == ">":
+                if self.PACK_FORMAT[0] == b">"[0]:  # The element access makes this compatible with Python 2 and 3
                     to_write = struct.pack(self.PACK_FORMAT, self._value)[-keep_bytes:]
                 else:
-                    raise SuitcaseProgrammingError("When specifying KEEP_BYTES, \
-                    PACK_FORMAT must start with `>` or `<`")
+                    to_write = struct.pack(self.PACK_FORMAT, self._value)[:keep_bytes]
             else:
                 to_write = struct.pack(self.PACK_FORMAT, self._value)
         except struct.error as e:
@@ -734,14 +731,12 @@ class BaseStructField(BaseField):
 
     def unpack(self, data):
         value = 0
-        if self.UNPACK_FORMAT[0] == "<":
-            for i, byte in enumerate(struct.unpack(self.UNPACK_FORMAT, data)):
-                value |= (byte << (i * 8))
-        elif self.UNPACK_FORMAT[0] == ">":
+        if self.UNPACK_FORMAT[0] == b">"[0]:  # The element access makes this compatible with Python 2 and 3
             for i, byte in enumerate(reversed(struct.unpack(self.UNPACK_FORMAT, data))):
                 value |= (byte << (i * 8))
         else:
-            raise SuitcaseProgrammingError("UNPACK_FORMAT must start with `>` or `<`")
+            for i, byte in enumerate(struct.unpack(self.UNPACK_FORMAT, data)):
+                value |= (byte << (i * 8))
         self._value = value
 
 
