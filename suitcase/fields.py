@@ -474,9 +474,8 @@ class TypeField(BaseField):
     integer value.  A TypeField can be pointed to by a variable
     length field and will fix that field's length.
 
-    :param type_field: The field providing the actual length value to
-        be used.  This field should return an integer value representing
-        the length (or a multiple of the length) as a return value
+    :param type_field: The field providing the type id that will
+        be used to lookup a length value
     :param length_mapping: This is a dictionary mapping type_field
         values to associated length values.
 
