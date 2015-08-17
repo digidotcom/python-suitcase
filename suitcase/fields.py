@@ -467,6 +467,76 @@ class LengthField(BaseField):
         return self.getval() * self.multiplier
 
 
+class TypeField(BaseField):
+    """Wraps an existing field marking it as a TypeField
+
+    This field wraps another field which is assumed to return an
+    integer value.  A TypeField can be pointed to by a variable
+    length field and will fix that field's length.
+
+    :param type_field: The field providing the actual length value to
+        be used.  This field should return an integer value representing
+        the length (or a multiple of the length) as a return value
+    :param length_mapping: This is a dictionary mapping type_field
+        values to associated length values.
+
+    """
+    def __init__(self, type_field, length_mapping, **kwargs):
+        BaseField.__init__(self, **kwargs)
+        self.type_field = type_field.create_instance(self._parent)
+        self.length_mapping = length_mapping
+        self.length_value_provider = None
+
+    def _lookup_msg_length(self):
+        target_key = self.type_field.getval()
+        target_length = self.length_mapping.get(target_key, None)
+        if target_length is None:
+            target_length = self.type_field.get(None, None)
+
+        return target_length
+
+    def __repr__(self):
+        return repr(self.type_field)
+
+    @property
+    def bytes_required(self):
+        return self.type_field.bytes_required
+
+    def getval(self):
+        return self.type_field.getval()
+
+    def setval(self, value):
+        self.type_field.setval(value)
+
+    def associate_length_consumer(self, target_field):
+        def _length_value_provider():
+            sio = BytesIO()
+            target_field.pack(sio)
+            target_field_length = len(sio.getvalue())
+            if target_field_length != self.get_adjusted_length():
+                raise SuitcaseProgrammingError("Payload length %i does not" + 
+                    " match length %i specified by type"
+                    % (target_field_length, self.get_adjusted_length()))
+            return target_field_length
+
+        self.length_value_provider = _length_value_provider
+
+    def pack(self, stream):
+        if self.length_value_provider is None:
+            raise SuitcaseException("No length_provider added to this TypeField")
+        # This will throw an exception if the length is not correct
+        self.length_value_provider()
+
+        self.type_field.pack(stream)
+
+    def unpack(self, data):
+        assert len(data) == self.bytes_required
+        return self.type_field.unpack(data)
+
+    def get_adjusted_length(self):
+        return self._lookup_msg_length()
+
+
 class ConditionalField(BaseField):
     """Field which may or may not be included depending on some condition
 

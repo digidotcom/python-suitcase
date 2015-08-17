@@ -17,7 +17,7 @@ from suitcase.fields import DependentField, LengthField, VariableRawPayload, \
     ULInt8, ULInt16, ULInt24, ULInt32, ULInt40, ULInt48, ULInt56, ULInt64, \
     SLInt8, SLInt16, SLInt24, SLInt32, SLInt40, SLInt48, SLInt56, SLInt64, \
     ConditionalField, UBInt8Sequence, SBInt8Sequence, FieldProperty, \
-    DispatchField, FieldArray
+    DispatchField, FieldArray, TypeField
 from suitcase.structure import Structure
 import struct
 
@@ -671,6 +671,7 @@ class TestStructure(unittest.TestCase):
     def test_unpack_more_bytes_than_required(self):
         self.assertRaises(SuitcaseParseError, MySimpleFixedPayload.from_data, b'12345')
 
+# Test FieldArray and ConditionalField interaction
 class ConditionalArrayElement(Structure):
     options = BitField(8,
                        cond8_present=BitBool(),
@@ -802,6 +803,73 @@ class TestConditionalArray(unittest.TestCase):
                          b"\x00" +
                          b"\xc0\x12\x34\x56" +
                          b"Hello")
+
+
+# Test TypeField and FieldArray interaction
+class Structure8(Structure):
+    value = UBInt8()
+
+
+class Structure16(Structure):
+    value = UBInt16()
+
+
+class Structure32(Structure):
+    value = UBInt32()
+
+
+dispatch_mapping = {0x00: Structure8,
+                    0x01: Structure16,
+                    0x03: Structure32}
+
+size_mapping = {0x00: 1,
+                0x01: 2,
+                0x03: 4}
+
+
+class TypedArrayElement(Structure):
+    type = TypeField(UBInt8(), size_mapping)
+    value = DispatchTarget(type, type, dispatch_mapping)
+
+
+class TypedArray(Structure):
+    array = FieldArray(TypedArrayElement)
+
+
+class TestTypedFieldArray(unittest.TestCase):
+    def test_unpack_typed_array(self):
+        m = TypedArray.from_data(b"\x00\x12" + 
+                                 b"\x01\x12\x34" +
+                                 b"\x03\x12\x34\x56\x78")
+
+        self.assertEqual(m.array[0].type, 0x00)
+        self.assertEqual(m.array[0].value.value, 0x12)
+
+        self.assertEqual(m.array[1].type, 0x01)
+        self.assertEqual(m.array[1].value.value, 0x1234)
+
+        self.assertEqual(m.array[2].type, 0x03)
+        self.assertEqual(m.array[2].value.value, 0x12345678)
+
+    def test_pack_typed_array(self):
+        m = TypedArray()
+
+        e1 = TypedArrayElement()
+        e1.value = Structure8.from_data(b"\x12")
+        m.array.append(e1)
+
+        e2 = TypedArrayElement()
+        e2.value = Structure16.from_data(b"\x12\x34")
+        m.array.append(e2)
+
+        e3 = TypedArrayElement()
+        e3.value = Structure32.from_data(b"\x12\x34\x56\x78")
+        m.array.append(e3)
+
+        self.assertEquals(m.pack(), b"\x00\x12" +
+                                    b"\x01\x12\x34" +
+                                    b"\x03\x12\x34\x56\x78")
+
 
 if __name__ == "__main__":
     unittest.main()
