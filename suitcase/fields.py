@@ -656,6 +656,51 @@ class DependentField(BaseField):
         return self._get_parent_field().setval(value)
 
 
+class FieldArray(BaseField):
+    """Field which contains a list of some other field.
+
+    In some protocols, there exist repeated substructures which are present in a
+    variable number. The variable nature of these fields make a DispatchField
+    and DispatchTarget combination unsuitable; instead a FieldArray may be
+    used to pack/unpack these fields to/from a list.
+
+    :param substructure: The type of the array element. Must not be a greedy
+        field, or else the array will only ever have one element containing
+        the entire contents of the array.
+    :param length_provider: The field providing a length value binding this
+        message (if any).  Set this field to None to leave unconstrained.
+
+    """
+    def __init__(self, substructure, length_provider=None, **kwargs):
+        BaseField.__init__(self, **kwargs)
+        self.substructure = substructure
+        self._value = list()
+        if isinstance(length_provider, FieldPlaceholder):
+            self.length_provider = self._ph2f(length_provider)
+            self.length_provider.associate_length_consumer(self)
+        else:
+            self.length_provider = None
+
+    @property
+    def bytes_required(self):
+        if self.length_provider is None:
+            return None
+        else:
+            return self.length_provider.get_adjusted_length()
+
+    def pack(self, stream):
+        for structure in self._value:
+            stream.write(structure.pack())
+
+    def unpack(self, data):
+        while True:
+            structure = self.substructure()
+            data = structure.unpack(data, trailing=True).read()
+            self._value.append(structure)
+            if data == b"":
+                break
+
+
 class BaseFixedByteSequence(BaseField):
     """Base fixed-length byte sequence field"""
 

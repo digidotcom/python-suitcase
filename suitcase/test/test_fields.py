@@ -16,7 +16,8 @@ from suitcase.fields import DependentField, LengthField, VariableRawPayload, \
     SBInt8, SBInt16, SBInt24, SBInt32, SBInt40, SBInt48, SBInt56, SBInt64, \
     ULInt8, ULInt16, ULInt24, ULInt32, ULInt40, ULInt48, ULInt56, ULInt64, \
     SLInt8, SLInt16, SLInt24, SLInt32, SLInt40, SLInt48, SLInt56, SLInt64, \
-    ConditionalField, UBInt8Sequence, SBInt8Sequence, FieldProperty, DispatchField
+    ConditionalField, UBInt8Sequence, SBInt8Sequence, FieldProperty, \
+    DispatchField, FieldArray
 from suitcase.structure import Structure
 import struct
 
@@ -670,6 +671,137 @@ class TestStructure(unittest.TestCase):
     def test_unpack_more_bytes_than_required(self):
         self.assertRaises(SuitcaseParseError, MySimpleFixedPayload.from_data, b'12345')
 
+class ConditionalArrayElement(Structure):
+    options = BitField(8,
+                       cond8_present=BitBool(),
+                       cond16_present=BitBool(),
+                       unused=BitNum(6))
+    cond8 = ConditionalField(UBInt8(), lambda m: m.options.cond8_present)
+    cond16 = ConditionalField(UBInt16(), lambda m: m.options.cond16_present)
+
+
+class ConditionalArrayGreedy(Structure):
+    array = FieldArray(ConditionalArrayElement)
+
+
+class ConditionalArrayGreedyAfter(Structure):
+    length = LengthField(UBInt8())
+    array = FieldArray(ConditionalArrayElement, length)
+    greedy = Payload()
+
+
+class TestConditionalArray(unittest.TestCase):
+    def test_unpack_greedy(self):
+        m = ConditionalArrayGreedy()
+        m.unpack(b"\x00" +
+                 b"\x80\x12" +
+                 b"\x40\x34\x56" +
+                 b"\xc0\x12\x34\x56")
+
+        self.assertEqual(len(m.array), 4)
+
+        self.assertEqual(m.array[0].options.cond8_present, 0)
+        self.assertEqual(m.array[0].options.cond16_present, 0)
+        self.assertEqual(m.array[0].cond8, None)
+        self.assertEqual(m.array[0].cond16, None)
+
+        self.assertEqual(m.array[1].options.cond8_present, 1)
+        self.assertEqual(m.array[1].options.cond16_present, 0)
+        self.assertEqual(m.array[1].cond8, 0x12)
+        self.assertEqual(m.array[1].cond16, None)
+
+        self.assertEqual(m.array[2].options.cond8_present, 0)
+        self.assertEqual(m.array[2].options.cond16_present, 1)
+        self.assertEqual(m.array[2].cond8, None)
+        self.assertEqual(m.array[2].cond16, 0x3456)
+
+        self.assertEqual(m.array[3].options.cond8_present, 1)
+        self.assertEqual(m.array[3].options.cond16_present, 1)
+        self.assertEqual(m.array[3].cond8, 0x12)
+        self.assertEqual(m.array[3].cond16, 0x3456)
+
+    def test_pack_greedy(self):
+        m = ConditionalArrayGreedy()
+
+        c1 = ConditionalArrayElement()
+        c1.options.cond8_present = False
+        c1.options.cond16_present = False
+        c1.cond8 = None
+        c1.cond16 = None
+        m.array.append(c1)
+
+        c2 = ConditionalArrayElement()
+        c2.options.cond8_present = True
+        c2.options.cond16_present = False
+        c2.cond8 = 0x12
+        c2.cond16 = None
+        m.array.append(c2)
+
+        c3 = ConditionalArrayElement()
+        c3.options.cond8_present = False
+        c3.options.cond16_present = True
+        c3.cond8 = None
+        c3.cond16 = 0x3456
+        m.array.append(c3)
+
+        c4 = ConditionalArrayElement()
+        c4.options.cond8_present = True
+        c4.options.cond16_present = True
+        c4.cond8 = 0x12
+        c4.cond16 = 0x3456
+        m.array.append(c4)
+
+        self.assertEqual(m.pack(),
+                         b"\x00" +
+                         b"\x80\x12" +
+                         b"\x40\x34\x56" +
+                         b"\xc0\x12\x34\x56")
+
+    def test_unpack_greedy_after(self):
+        m = ConditionalArrayGreedyAfter()
+        m.unpack(b"\x05" +
+                 b"\x00" +
+                 b"\xc0\x12\x34\x56" +
+                 b"Hello")
+
+        self.assertEqual(len(m.array), 2)
+
+        self.assertEqual(m.array[0].options.cond8_present, 0)
+        self.assertEqual(m.array[0].options.cond16_present, 0)
+        self.assertEqual(m.array[0].cond8, None)
+        self.assertEqual(m.array[0].cond16, None)
+
+        self.assertEqual(m.array[1].options.cond8_present, 1)
+        self.assertEqual(m.array[1].options.cond16_present, 1)
+        self.assertEqual(m.array[1].cond8, 0x12)
+        self.assertEqual(m.array[1].cond16, 0x3456)
+
+        self.assertEqual(m.greedy, b"Hello")
+
+    def test_pack_greedy_after(self):
+        m = ConditionalArrayGreedyAfter()
+
+        c1 = ConditionalArrayElement()
+        c1.options.cond8_present = False
+        c1.options.cond16_present = False
+        c1.cond8 = None
+        c1.cond16 = None
+        m.array.append(c1)
+
+        c2 = ConditionalArrayElement()
+        c2.options.cond8_present = True
+        c2.options.cond16_present = True
+        c2.cond8 = 0x12
+        c2.cond16 = 0x3456
+        m.array.append(c2)
+
+        m.greedy = b"Hello"
+
+        self.assertEqual(m.pack(),
+                         b"\x05" +
+                         b"\x00" +
+                         b"\xc0\x12\x34\x56" +
+                         b"Hello")
 
 if __name__ == "__main__":
     unittest.main()

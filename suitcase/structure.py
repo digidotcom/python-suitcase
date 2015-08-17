@@ -56,11 +56,13 @@ class Packer(object):
                 checksum_data = self.crc_field.packed_checksum(data)
                 stream.write(checksum_data)
 
-    def unpack(self, data):
+    def unpack(self, data, trailing=False):
         stream = BytesIO(data)
         self.unpack_stream(stream)
         stream.tell()
-        if stream.tell() != len(data):
+        if trailing:
+            return stream
+        elif stream.tell() != len(data):
             raise SuitcaseParseError("Structure fully parsed but additional bytes remained.  Parsing "
                                      "consumed %d of %d bytes" %
                                      (stream.tell(), len(data)))
@@ -288,8 +290,8 @@ class Structure(object):
     def lookup_field_by_placeholder(self, placeholder):
         return self._placeholder_to_field[placeholder]
 
-    def unpack(self, data):
-        return self._packer.unpack(data)
+    def unpack(self, data, trailing=False):
+        return self._packer.unpack(data, trailing)
 
     def pack(self):
         return self._packer.pack()
