@@ -9,7 +9,7 @@ import unittest
 import six
 from suitcase.crc import crc16_ccitt, crc32
 from suitcase.exceptions import SuitcaseProgrammingError, SuitcasePackStructException, SuitcasePackException, \
-    SuitcaseParseError
+    SuitcaseParseError, SuitcaseException
 from suitcase.fields import DependentField, LengthField, VariableRawPayload, \
     Magic, BitField, BitBool, BitNum, DispatchTarget, CRCField, Payload, \
     UBInt8, UBInt16, UBInt24, UBInt32, UBInt40, UBInt48, UBInt56, UBInt64, \
@@ -824,7 +824,7 @@ dispatch_mapping = {0x00: Structure8,
 
 size_mapping = {0x00: 1,
                 0x01: 2,
-                0x03: 4}
+                None: 4} # This handles the Structure32 case
 
 
 class TypedArrayElement(Structure):
@@ -836,7 +836,16 @@ class TypedArray(Structure):
     array = FieldArray(TypedArrayElement)
 
 
-class TestTypedFieldArray(unittest.TestCase):
+class TypeFieldNoLengthProvider(Structure):
+    type = TypeField(UBInt8(), size_mapping)
+
+
+class TypeFieldWrongSize(Structure):
+    type = TypeField(UBInt8(), size_mapping)
+    greedy = Payload(type)
+
+
+class TestTypeField(unittest.TestCase):
     def test_unpack_typed_array(self):
         m = TypedArray.from_data(b"\x00\x12" + 
                                  b"\x01\x12\x34" +
@@ -869,6 +878,22 @@ class TestTypedFieldArray(unittest.TestCase):
         self.assertEquals(m.pack(), b"\x00\x12" +
                                     b"\x01\x12\x34" +
                                     b"\x03\x12\x34\x56\x78")
+
+    def test_repr(self):
+        # Make sure nothing crashes
+        m = TypedArray.from_data(b"\x03\x12\x34\x56\x78")
+        repr(m)
+
+    def test_no_length_provider(self):
+        m = TypeFieldNoLengthProvider()
+        m.type = 0x01
+        self.assertRaises(SuitcaseException, m.pack)
+
+    def test_wrong_size(self):
+        m = TypeFieldWrongSize()
+        m.type = 0x01 # Indicates a length of 2
+        m.greedy = b"Hello"
+        self.assertRaises(SuitcasePackException, m.pack)
 
 
 if __name__ == "__main__":

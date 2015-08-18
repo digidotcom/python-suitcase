@@ -490,7 +490,7 @@ class TypeField(BaseField):
         target_key = self.type_field.getval()
         target_length = self.length_mapping.get(target_key, None)
         if target_length is None:
-            target_length = self.type_field.get(None, None)
+            target_length = self.length_mapping.get(None, None)
 
         return target_length
 
@@ -523,7 +523,7 @@ class TypeField(BaseField):
     def pack(self, stream):
         if self.length_value_provider is None:
             raise SuitcaseException("No length_provider added to this TypeField")
-        # This will throw an exception if the length is not correct
+        # This will throw a SuitcasePackException if the length is not correct
         self.length_value_provider()
 
         self.type_field.pack(stream)
