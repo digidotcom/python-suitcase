@@ -479,7 +479,27 @@ class TypeField(BaseField):
     :param length_mapping: This is a dictionary mapping type_field
         values to associated length values.
 
+    For example, a TypeField could be used as a replacement for a
+    DispatchField so that the associated DispatchTarget is non-greedy,
+    without the existence of a seperate LengthField. This enables
+    a greedy field to follow the dispatch field, without the usage of
+    complex ConditionalField setups::
+
+        class Structure8Bit(Structure):
+            value = UBInt8()
+
+        class Structure16Bit(Structure):
+            value = UBInt16()
+
+        class DispatchStructure(Structure):
+            type = TypeField(UBInt8(), {0x40: 1,
+                                        0x80: 2})
+            # Here the TypeField is providing both a size and type id
+            dispatch = DispatchTarget(type, type, {0x40: Structure8Bit,
+                                                   0x80: Structure16Bit})
+            greedy = Payload()
     """
+
     def __init__(self, type_field, length_mapping, **kwargs):
         BaseField.__init__(self, **kwargs)
         self.type_field = type_field.create_instance(self._parent)
@@ -513,9 +533,9 @@ class TypeField(BaseField):
             target_field.pack(sio)
             target_field_length = len(sio.getvalue())
             if target_field_length != self.get_adjusted_length():
-                raise SuitcaseProgrammingError("Payload length %i does not" + 
-                    " match length %i specified by type"
-                    % (target_field_length, self.get_adjusted_length()))
+                raise SuitcaseProgrammingError("Payload length %i does not" +
+                                               " match length %i specified by type"
+                                               % (target_field_length, self.get_adjusted_length()))
             return target_field_length
 
         self.length_value_provider = _length_value_provider
@@ -633,6 +653,7 @@ class Payload(BaseField):
     def unpack(self, data):
         self._value = data
 
+
 # keep for backwards compatability
 VariableRawPayload = Payload
 
@@ -725,6 +746,60 @@ class DependentField(BaseField):
         return self._get_parent_field().setval(value)
 
 
+class SubstructureField(BaseField):
+    """Field which contains another non-greedy Structure.
+
+    Often data-types are needed which cannot be easily
+    described by a single field, but are representable as
+    Structures. For example, Pascal style strings are prefixed
+    with their length. It is often desirable to embed these
+    data-types within another Structure, to avoid reimplementing
+    them in every usage.
+
+
+    A Pascal style string could be described as follows::
+
+        from suitcase.structure import Structure
+        from suitcase.fields import Payload, UBInt16, LengthField, SubstructureField
+
+        class PascalString16(Structure):
+            length = LengthField(UBInt16())
+            value = Payload(length)
+
+    A structure describing a name of a person might consist of two
+    Pascal style strings. Instead of describing the ugly way::
+
+        class NameUgly(Structure):
+            first_length = LengthField(UBInt16())
+            first_value = Payload(first_length)
+            last_length = LengthField(UBInt16())
+            last_value = Payload(last_length)
+
+    it could be defined using a SubstructureField::
+
+        class Name(Structure):
+            first = SubstructureField(PascalString16)
+            last = SubstructureField(PascalString16)
+    """
+
+    def __init__(self, substructure, **kwargs):
+        BaseField.__init__(self, **kwargs)
+        self.substructure = substructure
+        self._value = substructure()
+
+    @property
+    def bytes_required(self):
+        # We return None but do not count as a greedy field to the packer
+        return None
+
+    def pack(self, stream):
+        stream.write(self._value.pack())
+
+    def unpack(self, data, trailing):
+        self._value = self.substructure()
+        return self._value.unpack(data, trailing)
+
+
 class FieldArray(BaseField):
     """Field which contains a list of some other field.
 
@@ -739,7 +814,23 @@ class FieldArray(BaseField):
     :param length_provider: The field providing a length value binding this
         message (if any).  Set this field to None to leave unconstrained.
 
+    For example, one can imagine a message listing the zipcodes covered by
+    a telephone area code. Depending on the population density, the number
+    of zipcodes per area code could vary greatly. One implementation of this
+    data structure could be::
+
+        from suitcase.structure import Structure
+        from suitcase.fields import UBInt16, FieldArray
+
+        class ZipcodeStructure(Structure):
+            zipcode = UBInt16()
+
+        class TelephoneZipcodes(Structure):
+            areacode = UBInt16()
+            zipcodes = FieldArray(ZipcodeStructure)  # variable number of zipcodes
+
     """
+
     def __init__(self, substructure, length_provider=None, **kwargs):
         BaseField.__init__(self, **kwargs)
         self.substructure = substructure

@@ -8,7 +8,7 @@ import sys
 import six
 from suitcase.exceptions import SuitcaseException, \
     SuitcasePackException, SuitcaseParseError
-from suitcase.fields import FieldPlaceholder, CRCField
+from suitcase.fields import FieldPlaceholder, CRCField, SubstructureField
 from six import BytesIO
 
 
@@ -93,7 +93,13 @@ class Packer(object):
             if isinstance(field, CRCField):
                 crc_fields.append((field, stream.tell()))
             length = field.bytes_required
-            if length is None:
+            if isinstance(field, SubstructureField):
+                remaining_data = stream.getvalue()[stream.tell():]
+                returned_stream = field.unpack(remaining_data, trailing=True)
+                # We need to fast forward by as much as was consumed by the structure
+                stream.seek(stream.tell() + returned_stream.tell())
+                continue
+            elif length is None:
                 greedy_field = field
                 break
             else:

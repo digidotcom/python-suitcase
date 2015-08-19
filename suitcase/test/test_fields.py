@@ -17,7 +17,7 @@ from suitcase.fields import DependentField, LengthField, VariableRawPayload, \
     ULInt8, ULInt16, ULInt24, ULInt32, ULInt40, ULInt48, ULInt56, ULInt64, \
     SLInt8, SLInt16, SLInt24, SLInt32, SLInt40, SLInt48, SLInt56, SLInt64, \
     ConditionalField, UBInt8Sequence, SBInt8Sequence, FieldProperty, \
-    DispatchField, FieldArray, TypeField
+    DispatchField, FieldArray, TypeField, SubstructureField
 from suitcase.structure import Structure
 import struct
 
@@ -414,7 +414,6 @@ class BoxedGreedy(Structure):
 
 
 class CRCGreedyTail(Structure):
-
     payload = Payload()
     magic = Magic(b'~~')
     crc = CRCField(UBInt32(), crc32, 0, -1)  # all (checksum zeroed)
@@ -522,7 +521,6 @@ class TestMessageDispatching(unittest.TestCase):
 
 
 class TestMessageDispatchingVariableLength(unittest.TestCase):
-
     def test_fixed_field_dispatch_packing(self):
         msg = MyDynamicLengthDispatchMessage()
         target_msg = MySimpleFixedPayload()
@@ -664,12 +662,12 @@ class TestConditionalField(unittest.TestCase):
 
 
 class TestStructure(unittest.TestCase):
-
     def test_unpack_fewer_bytes_than_required(self):
         self.assertRaises(SuitcaseParseError, MySimpleFixedPayload.from_data, b'123')
 
     def test_unpack_more_bytes_than_required(self):
         self.assertRaises(SuitcaseParseError, MySimpleFixedPayload.from_data, b'12345')
+
 
 # Test FieldArray and ConditionalField interaction
 class ConditionalArrayElement(Structure):
@@ -824,7 +822,7 @@ dispatch_mapping = {0x00: Structure8,
 
 size_mapping = {0x00: 1,
                 0x01: 2,
-                None: 4} # This handles the Structure32 case
+                None: 4}  # This handles the Structure32 case
 
 
 class TypedArrayElement(Structure):
@@ -847,7 +845,7 @@ class TypeFieldWrongSize(Structure):
 
 class TestTypeField(unittest.TestCase):
     def test_unpack_typed_array(self):
-        m = TypedArray.from_data(b"\x00\x12" + 
+        m = TypedArray.from_data(b"\x00\x12" +
                                  b"\x01\x12\x34" +
                                  b"\x03\x12\x34\x56\x78")
 
@@ -876,8 +874,8 @@ class TestTypeField(unittest.TestCase):
         m.array.append(e3)
 
         self.assertEquals(m.pack(), b"\x00\x12" +
-                                    b"\x01\x12\x34" +
-                                    b"\x03\x12\x34\x56\x78")
+                          b"\x01\x12\x34" +
+                          b"\x03\x12\x34\x56\x78")
 
     def test_repr(self):
         # Make sure nothing crashes
@@ -891,10 +889,56 @@ class TestTypeField(unittest.TestCase):
 
     def test_wrong_size(self):
         m = TypeFieldWrongSize()
-        m.type = 0x01 # Indicates a length of 2
+        m.type = 0x01  # Indicates a length of 2
         m.greedy = b"Hello"
         self.assertRaises(SuitcasePackException, m.pack)
 
+
+# Test SubstructureField
+class PascalString16(Structure):
+    length = LengthField(UBInt16())
+    value = Payload(length)
+
+
+class NameStructure(Structure):
+    first = SubstructureField(PascalString16)
+    last = SubstructureField(PascalString16)
+
+
+class NameStructureGreedyAfter(Structure):
+    first = SubstructureField(PascalString16)
+    last = SubstructureField(PascalString16)
+    greedy = Payload()
+
+
+class TestSubstructureField(unittest.TestCase):
+    def test_pack_valid(self):
+        m = NameStructure()
+        m.first.value = b"John"
+        m.last.value = b"Doe"
+        self.assertEqual(m.pack(), b"\x00\x04John\x00\x03Doe")
+
+    def test_unpack_valid(self):
+        m = NameStructure().from_data(b"\x00\x04John\x00\x03Doe")
+        self.assertIsInstance(m.first, PascalString16)
+        self.assertEqual(m.first.value, b"John")
+        self.assertIsInstance(m.last, PascalString16)
+        self.assertEqual(m.last.value, b"Doe")
+
+    def test_pack_greedy_after(self):
+        m = NameStructureGreedyAfter()
+        m.first.value = b"John"
+        m.last.value = b"Doe"
+        m.greedy = b"Hello World!"
+        self.assertEqual(m.pack(), b"\x00\x04John\x00\x03DoeHello World!")
+
+    def test_unpack_greedy_after(self):
+        m = NameStructureGreedyAfter().from_data(b"\x00\x04John\x00\x03DoeHello World!")
+        self.assertIsInstance(m.first, PascalString16)
+        self.assertEqual(m.first.value, b"John")
+        self.assertIsInstance(m.last, PascalString16)
+        self.assertEqual(m.last.value, b"Doe")
+        self.assertEqual(m.greedy, b"Hello World!")
 
 if __name__ == "__main__":
     unittest.main()
