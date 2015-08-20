@@ -8,7 +8,7 @@ import sys
 import six
 from suitcase.exceptions import SuitcaseException, \
     SuitcasePackException, SuitcaseParseError
-from suitcase.fields import FieldPlaceholder, CRCField
+from suitcase.fields import FieldPlaceholder, CRCField, SubstructureField
 from six import BytesIO
 
 
@@ -56,11 +56,13 @@ class Packer(object):
                 checksum_data = self.crc_field.packed_checksum(data)
                 stream.write(checksum_data)
 
-    def unpack(self, data):
+    def unpack(self, data, trailing=False):
         stream = BytesIO(data)
         self.unpack_stream(stream)
         stream.tell()
-        if stream.tell() != len(data):
+        if trailing:
+            return stream
+        elif stream.tell() != len(data):
             raise SuitcaseParseError("Structure fully parsed but additional bytes remained.  Parsing "
                                      "consumed %d of %d bytes" %
                                      (stream.tell(), len(data)))
@@ -91,7 +93,13 @@ class Packer(object):
             if isinstance(field, CRCField):
                 crc_fields.append((field, stream.tell()))
             length = field.bytes_required
-            if length is None:
+            if isinstance(field, SubstructureField):
+                remaining_data = stream.getvalue()[stream.tell():]
+                returned_stream = field.unpack(remaining_data, trailing=True)
+                # We need to fast forward by as much as was consumed by the structure
+                stream.seek(stream.tell() + returned_stream.tell())
+                continue
+            elif length is None:
                 greedy_field = field
                 break
             else:
@@ -288,8 +296,8 @@ class Structure(object):
     def lookup_field_by_placeholder(self, placeholder):
         return self._placeholder_to_field[placeholder]
 
-    def unpack(self, data):
-        return self._packer.unpack(data)
+    def unpack(self, data, trailing=False):
+        return self._packer.unpack(data, trailing)
 
     def pack(self):
         return self._packer.pack()

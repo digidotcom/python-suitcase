@@ -9,12 +9,15 @@ import unittest
 import six
 from suitcase.crc import crc16_ccitt, crc32
 from suitcase.exceptions import SuitcaseProgrammingError, SuitcasePackStructException, SuitcasePackException, \
-    SuitcaseParseError
+    SuitcaseParseError, SuitcaseException
 from suitcase.fields import DependentField, LengthField, VariableRawPayload, \
-    Magic, BitField, BitBool, BitNum, UBInt8, UBInt16, UBInt24, UBInt32, UBInt64, \
-    SBInt8, SBInt16, SBInt32, SBInt64, ULInt8, ULInt16, ULInt32, ULInt64, SLInt8, \
-    SLInt16, SLInt32, SLInt64, ConditionalField, UBInt8Sequence, SBInt8Sequence, \
-    FieldProperty, DispatchField, DispatchTarget, CRCField, Payload
+    Magic, BitField, BitBool, BitNum, DispatchTarget, CRCField, Payload, \
+    UBInt8, UBInt16, UBInt24, UBInt32, UBInt40, UBInt48, UBInt56, UBInt64, \
+    SBInt8, SBInt16, SBInt24, SBInt32, SBInt40, SBInt48, SBInt56, SBInt64, \
+    ULInt8, ULInt16, ULInt24, ULInt32, ULInt40, ULInt48, ULInt56, ULInt64, \
+    SLInt8, SLInt16, SLInt24, SLInt32, SLInt40, SLInt48, SLInt56, SLInt64, \
+    ConditionalField, UBInt8Sequence, SBInt8Sequence, FieldProperty, \
+    DispatchField, FieldArray, TypeField, SubstructureField
 from suitcase.structure import Structure
 import struct
 
@@ -46,24 +49,39 @@ class SuperMessage(Structure):
     ubint16 = UBInt16()
     ubint24 = UBInt24()
     ubint32 = UBInt32()
+    ubint40 = UBInt40()
+    ubint48 = UBInt48()
+    ubint56 = UBInt56()
     ubint64 = UBInt64()
 
     # signed big endian
     sbint8 = SBInt8()
     sbint16 = SBInt16()
+    sbint24 = SBInt24()
     sbint32 = SBInt32()
+    sbint40 = SBInt40()
+    sbint48 = SBInt48()
+    sbint56 = SBInt56()
     sbint64 = SBInt64()
 
     # unsigned little endian
     ulint8 = ULInt8()
     ulint16 = ULInt16()
+    ulint24 = ULInt24()
     ulint32 = ULInt32()
+    ulint40 = ULInt40()
+    ulint48 = ULInt48()
+    ulint56 = ULInt56()
     ulint64 = ULInt64()
 
     # signed little endian
     slint8 = SLInt8()
     slint16 = SLInt16()
+    slint24 = SLInt24()
     slint32 = SLInt32()
+    slint40 = SLInt40()
+    slint48 = SLInt48()
+    slint56 = SLInt56()
     slint64 = SLInt64()
 
     # optional
@@ -118,25 +136,40 @@ class TestSuperField(unittest.TestCase):
         s.ubint16 = 0xAABB
         s.ubint24 = 0xAABBCC
         s.ubint32 = 0xAABBCCDD
+        s.ubint40 = 0xAABBCCDDEE
+        s.ubint48 = 0xAABBCCDDEEFF
+        s.ubint56 = 0xAABBCCDDEEFF00
         s.ubint64 = 0xAABBCCDDEEFF0011
 
-        s.sbint8 = -25
-        s.sbint16 = -312
-        s.sbint32 = -9570
-        s.sbint64 = -29349579
+        s.sbint8 = -100
+        s.sbint16 = -1000
+        s.sbint24 = -100000
+        s.sbint32 = -100000000
+        s.sbint40 = -10000000000
+        s.sbint48 = -10000000000000
+        s.sbint56 = -1000000000000000
+        s.sbint64 = -100000000000000000
 
         s.ulint8 = 0xAA
         s.ulint16 = 0xAABB
         s.ulint16_byte_string = b'\xAA\xBB'
         s.ulint16_value = 0xBBAA
 
+        s.ulint24 = 0xAABBCC
         s.ulint32 = 0xAABBCCDD
+        s.ulint40 = 0xAABBCCDDEE
+        s.ulint48 = 0xAABBCCDDEEFF
+        s.ulint56 = 0xAABBCCDDEEFF00
         s.ulint64 = 0xAABBCCDDEEFF0011
 
-        s.slint8 = -25
-        s.slint16 = -312
-        s.slint32 = -9570
-        s.slint64 = -29349579
+        s.slint8 = -100
+        s.slint16 = -1000
+        s.slint24 = -100000
+        s.slint32 = -100000000
+        s.slint40 = -10000000000
+        s.slint48 = -10000000000000
+        s.slint56 = -1000000000000000
+        s.slint64 = -100000000000000000
 
         s.optional_one = 1
         s.optional_two = 2
@@ -381,7 +414,6 @@ class BoxedGreedy(Structure):
 
 
 class CRCGreedyTail(Structure):
-
     payload = Payload()
     magic = Magic(b'~~')
     crc = CRCField(UBInt32(), crc32, 0, -1)  # all (checksum zeroed)
@@ -489,7 +521,6 @@ class TestMessageDispatching(unittest.TestCase):
 
 
 class TestMessageDispatchingVariableLength(unittest.TestCase):
-
     def test_fixed_field_dispatch_packing(self):
         msg = MyDynamicLengthDispatchMessage()
         target_msg = MySimpleFixedPayload()
@@ -631,13 +662,283 @@ class TestConditionalField(unittest.TestCase):
 
 
 class TestStructure(unittest.TestCase):
-
     def test_unpack_fewer_bytes_than_required(self):
         self.assertRaises(SuitcaseParseError, MySimpleFixedPayload.from_data, b'123')
 
     def test_unpack_more_bytes_than_required(self):
         self.assertRaises(SuitcaseParseError, MySimpleFixedPayload.from_data, b'12345')
 
+
+# Test FieldArray and ConditionalField interaction
+class ConditionalArrayElement(Structure):
+    options = BitField(8,
+                       cond8_present=BitBool(),
+                       cond16_present=BitBool(),
+                       unused=BitNum(6))
+    cond8 = ConditionalField(UBInt8(), lambda m: m.options.cond8_present)
+    cond16 = ConditionalField(UBInt16(), lambda m: m.options.cond16_present)
+
+
+class ConditionalArrayGreedy(Structure):
+    array = FieldArray(ConditionalArrayElement)
+
+
+class ConditionalArrayGreedyAfter(Structure):
+    length = LengthField(UBInt8())
+    array = FieldArray(ConditionalArrayElement, length)
+    greedy = Payload()
+
+
+class TestConditionalArray(unittest.TestCase):
+    def test_unpack_greedy(self):
+        m = ConditionalArrayGreedy()
+        m.unpack(b"\x00" +
+                 b"\x80\x12" +
+                 b"\x40\x34\x56" +
+                 b"\xc0\x12\x34\x56")
+
+        self.assertEqual(len(m.array), 4)
+
+        self.assertEqual(m.array[0].options.cond8_present, 0)
+        self.assertEqual(m.array[0].options.cond16_present, 0)
+        self.assertEqual(m.array[0].cond8, None)
+        self.assertEqual(m.array[0].cond16, None)
+
+        self.assertEqual(m.array[1].options.cond8_present, 1)
+        self.assertEqual(m.array[1].options.cond16_present, 0)
+        self.assertEqual(m.array[1].cond8, 0x12)
+        self.assertEqual(m.array[1].cond16, None)
+
+        self.assertEqual(m.array[2].options.cond8_present, 0)
+        self.assertEqual(m.array[2].options.cond16_present, 1)
+        self.assertEqual(m.array[2].cond8, None)
+        self.assertEqual(m.array[2].cond16, 0x3456)
+
+        self.assertEqual(m.array[3].options.cond8_present, 1)
+        self.assertEqual(m.array[3].options.cond16_present, 1)
+        self.assertEqual(m.array[3].cond8, 0x12)
+        self.assertEqual(m.array[3].cond16, 0x3456)
+
+    def test_pack_greedy(self):
+        m = ConditionalArrayGreedy()
+
+        c1 = ConditionalArrayElement()
+        c1.options.cond8_present = False
+        c1.options.cond16_present = False
+        c1.cond8 = None
+        c1.cond16 = None
+        m.array.append(c1)
+
+        c2 = ConditionalArrayElement()
+        c2.options.cond8_present = True
+        c2.options.cond16_present = False
+        c2.cond8 = 0x12
+        c2.cond16 = None
+        m.array.append(c2)
+
+        c3 = ConditionalArrayElement()
+        c3.options.cond8_present = False
+        c3.options.cond16_present = True
+        c3.cond8 = None
+        c3.cond16 = 0x3456
+        m.array.append(c3)
+
+        c4 = ConditionalArrayElement()
+        c4.options.cond8_present = True
+        c4.options.cond16_present = True
+        c4.cond8 = 0x12
+        c4.cond16 = 0x3456
+        m.array.append(c4)
+
+        self.assertEqual(m.pack(),
+                         b"\x00" +
+                         b"\x80\x12" +
+                         b"\x40\x34\x56" +
+                         b"\xc0\x12\x34\x56")
+
+    def test_unpack_greedy_after(self):
+        m = ConditionalArrayGreedyAfter()
+        m.unpack(b"\x05" +
+                 b"\x00" +
+                 b"\xc0\x12\x34\x56" +
+                 b"Hello")
+
+        self.assertEqual(len(m.array), 2)
+
+        self.assertEqual(m.array[0].options.cond8_present, 0)
+        self.assertEqual(m.array[0].options.cond16_present, 0)
+        self.assertEqual(m.array[0].cond8, None)
+        self.assertEqual(m.array[0].cond16, None)
+
+        self.assertEqual(m.array[1].options.cond8_present, 1)
+        self.assertEqual(m.array[1].options.cond16_present, 1)
+        self.assertEqual(m.array[1].cond8, 0x12)
+        self.assertEqual(m.array[1].cond16, 0x3456)
+
+        self.assertEqual(m.greedy, b"Hello")
+
+    def test_pack_greedy_after(self):
+        m = ConditionalArrayGreedyAfter()
+
+        c1 = ConditionalArrayElement()
+        c1.options.cond8_present = False
+        c1.options.cond16_present = False
+        c1.cond8 = None
+        c1.cond16 = None
+        m.array.append(c1)
+
+        c2 = ConditionalArrayElement()
+        c2.options.cond8_present = True
+        c2.options.cond16_present = True
+        c2.cond8 = 0x12
+        c2.cond16 = 0x3456
+        m.array.append(c2)
+
+        m.greedy = b"Hello"
+
+        self.assertEqual(m.pack(),
+                         b"\x05" +
+                         b"\x00" +
+                         b"\xc0\x12\x34\x56" +
+                         b"Hello")
+
+
+# Test TypeField and FieldArray interaction
+class Structure8(Structure):
+    value = UBInt8()
+
+
+class Structure16(Structure):
+    value = UBInt16()
+
+
+class Structure32(Structure):
+    value = UBInt32()
+
+
+dispatch_mapping = {0x00: Structure8,
+                    0x01: Structure16,
+                    0x03: Structure32}
+
+size_mapping = {0x00: 1,
+                0x01: 2,
+                None: 4}  # This handles the Structure32 case
+
+
+class TypedArrayElement(Structure):
+    type = TypeField(UBInt8(), size_mapping)
+    value = DispatchTarget(type, type, dispatch_mapping)
+
+
+class TypedArray(Structure):
+    array = FieldArray(TypedArrayElement)
+
+
+class TypeFieldNoLengthProvider(Structure):
+    type = TypeField(UBInt8(), size_mapping)
+
+
+class TypeFieldWrongSize(Structure):
+    type = TypeField(UBInt8(), size_mapping)
+    greedy = Payload(type)
+
+
+class TestTypeField(unittest.TestCase):
+    def test_unpack_typed_array(self):
+        m = TypedArray.from_data(b"\x00\x12" +
+                                 b"\x01\x12\x34" +
+                                 b"\x03\x12\x34\x56\x78")
+
+        self.assertEqual(m.array[0].type, 0x00)
+        self.assertEqual(m.array[0].value.value, 0x12)
+
+        self.assertEqual(m.array[1].type, 0x01)
+        self.assertEqual(m.array[1].value.value, 0x1234)
+
+        self.assertEqual(m.array[2].type, 0x03)
+        self.assertEqual(m.array[2].value.value, 0x12345678)
+
+    def test_pack_typed_array(self):
+        m = TypedArray()
+
+        e1 = TypedArrayElement()
+        e1.value = Structure8.from_data(b"\x12")
+        m.array.append(e1)
+
+        e2 = TypedArrayElement()
+        e2.value = Structure16.from_data(b"\x12\x34")
+        m.array.append(e2)
+
+        e3 = TypedArrayElement()
+        e3.value = Structure32.from_data(b"\x12\x34\x56\x78")
+        m.array.append(e3)
+
+        self.assertEquals(m.pack(), b"\x00\x12" +
+                          b"\x01\x12\x34" +
+                          b"\x03\x12\x34\x56\x78")
+
+    def test_repr(self):
+        # Make sure nothing crashes
+        m = TypedArray.from_data(b"\x03\x12\x34\x56\x78")
+        repr(m)
+
+    def test_no_length_provider(self):
+        m = TypeFieldNoLengthProvider()
+        m.type = 0x01
+        self.assertRaises(SuitcaseException, m.pack)
+
+    def test_wrong_size(self):
+        m = TypeFieldWrongSize()
+        m.type = 0x01  # Indicates a length of 2
+        m.greedy = b"Hello"
+        self.assertRaises(SuitcasePackException, m.pack)
+
+
+# Test SubstructureField
+class PascalString16(Structure):
+    length = LengthField(UBInt16())
+    value = Payload(length)
+
+
+class NameStructure(Structure):
+    first = SubstructureField(PascalString16)
+    last = SubstructureField(PascalString16)
+
+
+class NameStructureGreedyAfter(Structure):
+    first = SubstructureField(PascalString16)
+    last = SubstructureField(PascalString16)
+    greedy = Payload()
+
+
+class TestSubstructureField(unittest.TestCase):
+    def test_pack_valid(self):
+        m = NameStructure()
+        m.first.value = b"John"
+        m.last.value = b"Doe"
+        self.assertEqual(m.pack(), b"\x00\x04John\x00\x03Doe")
+
+    def test_unpack_valid(self):
+        m = NameStructure().from_data(b"\x00\x04John\x00\x03Doe")
+        self.assertIsInstance(m.first, PascalString16)
+        self.assertEqual(m.first.value, b"John")
+        self.assertIsInstance(m.last, PascalString16)
+        self.assertEqual(m.last.value, b"Doe")
+
+    def test_pack_greedy_after(self):
+        m = NameStructureGreedyAfter()
+        m.first.value = b"John"
+        m.last.value = b"Doe"
+        m.greedy = b"Hello World!"
+        self.assertEqual(m.pack(), b"\x00\x04John\x00\x03DoeHello World!")
+
+    def test_unpack_greedy_after(self):
+        m = NameStructureGreedyAfter().from_data(b"\x00\x04John\x00\x03DoeHello World!")
+        self.assertIsInstance(m.first, PascalString16)
+        self.assertEqual(m.first.value, b"John")
+        self.assertIsInstance(m.last, PascalString16)
+        self.assertEqual(m.last.value, b"Doe")
+        self.assertEqual(m.greedy, b"Hello World!")
 
 if __name__ == "__main__":
     unittest.main()

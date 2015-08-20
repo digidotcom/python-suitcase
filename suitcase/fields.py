@@ -3,11 +3,11 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #
 # Copyright (c) 2015 Digi International Inc. All Rights Reserved.
-import six
+import struct
 
+import six
 from suitcase.exceptions import SuitcaseChecksumException, SuitcaseProgrammingError, \
     SuitcaseParseError, SuitcaseException, SuitcasePackStructException
-import struct
 from six import BytesIO, StringIO
 
 
@@ -467,6 +467,95 @@ class LengthField(BaseField):
         return self.getval() * self.multiplier
 
 
+class TypeField(BaseField):
+    """Wraps an existing field marking it as a TypeField
+
+    This field wraps another field which is assumed to return an
+    integer value.  A TypeField can be pointed to by a variable
+    length field and will fix that field's length.
+
+    :param type_field: The field providing the type id that will
+        be used to lookup a length value
+    :param length_mapping: This is a dictionary mapping type_field
+        values to associated length values.
+
+    For example, a TypeField could be used as a replacement for a
+    DispatchField so that the associated DispatchTarget is non-greedy,
+    without the existence of a seperate LengthField. This enables
+    a greedy field to follow the dispatch field, without the usage of
+    complex ConditionalField setups::
+
+        class Structure8Bit(Structure):
+            value = UBInt8()
+
+        class Structure16Bit(Structure):
+            value = UBInt16()
+
+        class DispatchStructure(Structure):
+            type = TypeField(UBInt8(), {0x40: 1,
+                                        0x80: 2})
+            # Here the TypeField is providing both a size and type id
+            dispatch = DispatchTarget(type, type, {0x40: Structure8Bit,
+                                                   0x80: Structure16Bit})
+            greedy = Payload()
+    """
+
+    def __init__(self, type_field, length_mapping, **kwargs):
+        BaseField.__init__(self, **kwargs)
+        self.type_field = type_field.create_instance(self._parent)
+        self.length_mapping = length_mapping
+        self.length_value_provider = None
+
+    def _lookup_msg_length(self):
+        target_key = self.type_field.getval()
+        target_length = self.length_mapping.get(target_key, None)
+        if target_length is None:
+            target_length = self.length_mapping.get(None, None)
+
+        return target_length
+
+    def __repr__(self):
+        return repr(self.type_field)
+
+    @property
+    def bytes_required(self):
+        return self.type_field.bytes_required
+
+    def getval(self):
+        return self.type_field.getval()
+
+    def setval(self, value):
+        self.type_field.setval(value)
+
+    def associate_length_consumer(self, target_field):
+        def _length_value_provider():
+            sio = BytesIO()
+            target_field.pack(sio)
+            target_field_length = len(sio.getvalue())
+            if target_field_length != self.get_adjusted_length():
+                raise SuitcaseProgrammingError("Payload length %i does not" +
+                                               " match length %i specified by type"
+                                               % (target_field_length, self.get_adjusted_length()))
+            return target_field_length
+
+        self.length_value_provider = _length_value_provider
+
+    def pack(self, stream):
+        if self.length_value_provider is None:
+            raise SuitcaseException("No length_provider added to this TypeField")
+        # This will throw a SuitcasePackException if the length is not correct
+        self.length_value_provider()
+
+        self.type_field.pack(stream)
+
+    def unpack(self, data):
+        assert len(data) == self.bytes_required
+        return self.type_field.unpack(data)
+
+    def get_adjusted_length(self):
+        return self._lookup_msg_length()
+
+
 class ConditionalField(BaseField):
     """Field which may or may not be included depending on some condition
 
@@ -564,6 +653,7 @@ class Payload(BaseField):
     def unpack(self, data):
         self._value = data
 
+
 # keep for backwards compatability
 VariableRawPayload = Payload
 
@@ -656,6 +746,121 @@ class DependentField(BaseField):
         return self._get_parent_field().setval(value)
 
 
+class SubstructureField(BaseField):
+    """Field which contains another non-greedy Structure.
+
+    Often data-types are needed which cannot be easily
+    described by a single field, but are representable as
+    Structures. For example, Pascal style strings are prefixed
+    with their length. It is often desirable to embed these
+    data-types within another Structure, to avoid reimplementing
+    them in every usage.
+
+
+    A Pascal style string could be described as follows::
+
+        from suitcase.structure import Structure
+        from suitcase.fields import Payload, UBInt16, LengthField, SubstructureField
+
+        class PascalString16(Structure):
+            length = LengthField(UBInt16())
+            value = Payload(length)
+
+    A structure describing a name of a person might consist of two
+    Pascal style strings. Instead of describing the ugly way::
+
+        class NameUgly(Structure):
+            first_length = LengthField(UBInt16())
+            first_value = Payload(first_length)
+            last_length = LengthField(UBInt16())
+            last_value = Payload(last_length)
+
+    it could be defined using a SubstructureField::
+
+        class Name(Structure):
+            first = SubstructureField(PascalString16)
+            last = SubstructureField(PascalString16)
+    """
+
+    def __init__(self, substructure, **kwargs):
+        BaseField.__init__(self, **kwargs)
+        self.substructure = substructure
+        self._value = substructure()
+
+    @property
+    def bytes_required(self):
+        # We return None but do not count as a greedy field to the packer
+        return None
+
+    def pack(self, stream):
+        stream.write(self._value.pack())
+
+    def unpack(self, data, trailing):
+        self._value = self.substructure()
+        return self._value.unpack(data, trailing)
+
+
+class FieldArray(BaseField):
+    """Field which contains a list of some other field.
+
+    In some protocols, there exist repeated substructures which are present in a
+    variable number. The variable nature of these fields make a DispatchField
+    and DispatchTarget combination unsuitable; instead a FieldArray may be
+    used to pack/unpack these fields to/from a list.
+
+    :param substructure: The type of the array element. Must not be a greedy
+        field, or else the array will only ever have one element containing
+        the entire contents of the array.
+    :param length_provider: The field providing a length value binding this
+        message (if any).  Set this field to None to leave unconstrained.
+
+    For example, one can imagine a message listing the zipcodes covered by
+    a telephone area code. Depending on the population density, the number
+    of zipcodes per area code could vary greatly. One implementation of this
+    data structure could be::
+
+        from suitcase.structure import Structure
+        from suitcase.fields import UBInt16, FieldArray
+
+        class ZipcodeStructure(Structure):
+            zipcode = UBInt16()
+
+        class TelephoneZipcodes(Structure):
+            areacode = UBInt16()
+            zipcodes = FieldArray(ZipcodeStructure)  # variable number of zipcodes
+
+    """
+
+    def __init__(self, substructure, length_provider=None, **kwargs):
+        BaseField.__init__(self, **kwargs)
+        self.substructure = substructure
+        self._value = list()
+        if isinstance(length_provider, FieldPlaceholder):
+            self.length_provider = self._ph2f(length_provider)
+            self.length_provider.associate_length_consumer(self)
+        else:
+            self.length_provider = None
+
+    @property
+    def bytes_required(self):
+        if self.length_provider is None:
+            return None
+        else:
+            return self.length_provider.get_adjusted_length()
+
+    def pack(self, stream):
+        for structure in self._value:
+            stream.write(structure.pack())
+
+    def unpack(self, data):
+        while True:
+            structure = self.substructure()
+            data = structure.unpack(data, trailing=True).read()
+            self._value.append(structure)
+            if data == b"":
+                break
+
+
 class BaseFixedByteSequence(BaseField):
     """Base fixed-length byte sequence field"""
 
@@ -697,7 +902,7 @@ class BaseStructField(BaseField):
     """Base for fields based very directly on python struct module formats
 
     It is expected that this class will be subclassed and customized by
-    definining ``FORMAT`` at the class level.  ``FORMAT`` is expected to
+    defining ``FORMAT`` at the class level.  ``FORMAT`` is expected to
     be a format string that could be used with struct.pack/unpack.  It
     should include endianess information.  If the ``FORMAT`` includes
     multiple elements, the default ``_unpack`` logic assumes that each
@@ -719,7 +924,10 @@ class BaseStructField(BaseField):
         try:
             keep_bytes = getattr(self, 'KEEP_BYTES', None)
             if keep_bytes is not None:
-                to_write = struct.pack(self.PACK_FORMAT, self._value)[-keep_bytes:]
+                if self.PACK_FORMAT[0] == b">"[0]:  # The element access makes this compatible with Python 2 and 3
+                    to_write = struct.pack(self.PACK_FORMAT, self._value)[-keep_bytes:]
+                else:
+                    to_write = struct.pack(self.PACK_FORMAT, self._value)[:keep_bytes]
             else:
                 to_write = struct.pack(self.PACK_FORMAT, self._value)
         except struct.error as e:
@@ -728,8 +936,12 @@ class BaseStructField(BaseField):
 
     def unpack(self, data):
         value = 0
-        for i, byte in enumerate(reversed(struct.unpack(self.UNPACK_FORMAT, data))):
-            value |= (byte << (i * 8))
+        if self.UNPACK_FORMAT[0] == b">"[0]:  # The element access makes this compatible with Python 2 and 3
+            for i, byte in enumerate(reversed(struct.unpack(self.UNPACK_FORMAT, data))):
+                value |= (byte << (i * 8))
+        else:
+            for i, byte in enumerate(struct.unpack(self.UNPACK_FORMAT, data)):
+                value |= (byte << (i * 8))
         self._value = value
 
 
@@ -758,6 +970,27 @@ class UBInt32(BaseStructField):
     PACK_FORMAT = UNPACK_FORMAT = b">I"
 
 
+class UBInt40(BaseStructField):
+    """Unsigned Big Endian 40-bit integer field"""
+    KEEP_BYTES = 5
+    PACK_FORMAT = b">Q"
+    UNPACK_FORMAT = b">BBBBB"
+
+
+class UBInt48(BaseStructField):
+    """Unsigned Big Endian 48-bit integer field"""
+    KEEP_BYTES = 6
+    PACK_FORMAT = b">Q"
+    UNPACK_FORMAT = b">BBBBBB"
+
+
+class UBInt56(BaseStructField):
+    """Unsigned Big Endian 56-bit integer field"""
+    KEEP_BYTES = 7
+    PACK_FORMAT = b">Q"
+    UNPACK_FORMAT = b">BBBBBBB"
+
+
 class UBInt64(BaseStructField):
     """Unsigned Big Endian 64-bit integer field"""
     PACK_FORMAT = UNPACK_FORMAT = b">Q"
@@ -776,9 +1009,37 @@ class SBInt16(BaseStructField):
     PACK_FORMAT = UNPACK_FORMAT = b">h"
 
 
+class SBInt24(BaseStructField):
+    """Signed Big Endian 24-bit integer field"""
+    KEEP_BYTES = 3
+    PACK_FORMAT = b">i"
+    UNPACK_FORMAT = b">bBB"
+
+
 class SBInt32(BaseStructField):
     """Signed Big Endian 32-bit integer field"""
     PACK_FORMAT = UNPACK_FORMAT = b">i"
+
+
+class SBInt40(BaseStructField):
+    """Signed Big Endian 40-bit integer field"""
+    KEEP_BYTES = 5
+    PACK_FORMAT = b">q"
+    UNPACK_FORMAT = b">bBBBB"
+
+
+class SBInt48(BaseStructField):
+    """Signed Big Endian 48-bit integer field"""
+    KEEP_BYTES = 6
+    PACK_FORMAT = b">q"
+    UNPACK_FORMAT = b">bBBBBB"
+
+
+class SBInt56(BaseStructField):
+    """Signed Big Endian 56-bit integer field"""
+    KEEP_BYTES = 7
+    PACK_FORMAT = b">q"
+    UNPACK_FORMAT = b">bBBBBBB"
 
 
 class SBInt64(BaseStructField):
@@ -799,9 +1060,37 @@ class ULInt16(BaseStructField):
     PACK_FORMAT = UNPACK_FORMAT = b"<H"
 
 
+class ULInt24(BaseStructField):
+    """Unsigned Little Endian 24-bit integer field"""
+    KEEP_BYTES = 3
+    PACK_FORMAT = b"<I"
+    UNPACK_FORMAT = b"<BBB"
+
+
 class ULInt32(BaseStructField):
     """Unsigned Little Endian 32-bit integer field"""
     PACK_FORMAT = UNPACK_FORMAT = b"<I"
+
+
+class ULInt40(BaseStructField):
+    """Unsigned Little Endian 40-bit integer field"""
+    KEEP_BYTES = 5
+    PACK_FORMAT = b"<Q"
+    UNPACK_FORMAT = b"<BBBBB"
+
+
+class ULInt48(BaseStructField):
+    """Unsigned Little Endian 48-bit integer field"""
+    KEEP_BYTES = 6
+    PACK_FORMAT = b"<Q"
+    UNPACK_FORMAT = b"<BBBBBB"
+
+
+class ULInt56(BaseStructField):
+    """Unsigned Little Endian 56-bit integer field"""
+    KEEP_BYTES = 7
+    PACK_FORMAT = b"<Q"
+    UNPACK_FORMAT = b"<BBBBBBB"
 
 
 class ULInt64(BaseStructField):
@@ -822,9 +1111,37 @@ class SLInt16(BaseStructField):
     PACK_FORMAT = UNPACK_FORMAT = b"<h"
 
 
+class SLInt24(BaseStructField):
+    """Signed Little Endian 24-bit integer field"""
+    KEEP_BYTES = 3
+    PACK_FORMAT = b"<i"
+    UNPACK_FORMAT = b"<BBb"
+
+
 class SLInt32(BaseStructField):
     """Signed Little Endian 32-bit integer field"""
     PACK_FORMAT = UNPACK_FORMAT = b"<i"
+
+
+class SLInt40(BaseStructField):
+    """Signed Little Endian 40-bit integer field"""
+    KEEP_BYTES = 5
+    PACK_FORMAT = b"<q"
+    UNPACK_FORMAT = b"<BBBBb"
+
+
+class SLInt48(BaseStructField):
+    """Signed Little Endian 48-bit integer field"""
+    KEEP_BYTES = 6
+    PACK_FORMAT = b"<q"
+    UNPACK_FORMAT = b"<BBBBBb"
+
+
+class SLInt56(BaseStructField):
+    """Signed Little Endian 56-bit integer field"""
+    KEEP_BYTES = 7
+    PACK_FORMAT = b"<q"
+    UNPACK_FORMAT = b"<BBBBBBb"
 
 
 class SLInt64(BaseStructField):
@@ -976,6 +1293,9 @@ class BitField(BaseField):
                 2: UBInt16,
                 3: UBInt24,
                 4: UBInt32,
+                5: UBInt40,
+                6: UBInt48,
+                7: UBInt56,
                 8: UBInt64,
             }[self.number_bytes]()
         self._field = field.create_instance(self._parent)
