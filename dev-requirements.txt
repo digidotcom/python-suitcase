@@ -5,4 +5,4 @@ nose
 mock
 sphinx
 tox
-coverage
+coverage==3.7.1
