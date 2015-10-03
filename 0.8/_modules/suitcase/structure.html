@@ -1,0 +1,405 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>suitcase.structure &mdash; suitcase 0.6 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="suitcase 0.6 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" />
+   
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+
+  </head>
+  <body role="document">  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for suitcase.structure</h1><div class="highlight"><pre>
+<span class="c"># This Source Code Form is subject to the terms of the Mozilla Public</span>
+<span class="c"># License, v. 2.0. If a copy of the MPL was not distributed with this</span>
+<span class="c"># file, You can obtain one at http://mozilla.org/MPL/2.0/.</span>
+<span class="c">#</span>
+<span class="c"># Copyright (c) 2015 Digi International Inc. All Rights Reserved.</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+
+<span class="kn">import</span> <span class="nn">six</span>
+<span class="kn">from</span> <span class="nn">suitcase.exceptions</span> <span class="kn">import</span> <span class="n">SuitcaseException</span><span class="p">,</span> \
+    <span class="n">SuitcasePackException</span><span class="p">,</span> <span class="n">SuitcaseParseError</span>
+<span class="kn">from</span> <span class="nn">suitcase.fields</span> <span class="kn">import</span> <span class="n">FieldPlaceholder</span><span class="p">,</span> <span class="n">CRCField</span><span class="p">,</span> <span class="n">SubstructureField</span>
+<span class="kn">from</span> <span class="nn">six</span> <span class="kn">import</span> <span class="n">BytesIO</span>
+
+
+<div class="viewcode-block" id="ParseError"><a class="viewcode-back" href="../../api.html#suitcase.structure.ParseError">[docs]</a><span class="k">class</span> <span class="nc">ParseError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Exception raied when there is an error parsing&quot;&quot;&quot;</span>
+
+</div>
+<div class="viewcode-block" id="Packer"><a class="viewcode-back" href="../../api.html#suitcase.structure.Packer">[docs]</a><span class="k">class</span> <span class="nc">Packer</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Object responsible for packing/unpacking bytes into/from fields&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ordered_fields</span><span class="p">,</span> <span class="n">crc_field</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">crc_field</span> <span class="o">=</span> <span class="n">crc_field</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ordered_fields</span> <span class="o">=</span> <span class="n">ordered_fields</span>
+
+    <span class="k">def</span> <span class="nf">pack</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">sio</span> <span class="o">=</span> <span class="n">BytesIO</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">sio</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">sio</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">):</span>
+        <span class="c"># now, pack everything in</span>
+        <span class="n">crc_fields</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ordered_fields</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">CRCField</span><span class="p">):</span>
+                    <span class="n">crc_offset</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">tell</span><span class="p">()</span>
+                    <span class="n">field</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="n">stream</span><span class="p">)</span>
+                    <span class="n">crc_fields</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">field</span><span class="p">,</span> <span class="n">crc_offset</span><span class="p">))</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">field</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="n">stream</span><span class="p">)</span>
+            <span class="k">except</span> <span class="n">SuitcaseException</span><span class="p">:</span>
+                <span class="k">raise</span>  <span class="c"># just reraise the same exception object</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="c"># keep the original traceback information, see</span>
+                <span class="c"># http://stackoverflow.com/questions/3847503/wrapping-exceptions-in-python</span>
+                <span class="n">exc_value</span> <span class="o">=</span> <span class="n">SuitcasePackException</span><span class="p">(</span><span class="s">&quot;Unexpected exception during pack of </span><span class="si">%r</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">name</span><span class="p">)</span>
+                <span class="n">six</span><span class="o">.</span><span class="n">reraise</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">exc_value</span><span class="p">),</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()[</span><span class="mi">2</span><span class="p">])</span>
+
+        <span class="c"># if there is a crc value, seek back to the field and</span>
+        <span class="c"># pack it with the right value</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">crc_fields</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">field</span><span class="p">,</span> <span class="n">offset</span> <span class="ow">in</span> <span class="n">crc_fields</span><span class="p">:</span>
+                <span class="n">stream</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="n">offset</span><span class="p">)</span>
+                <span class="n">checksum_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">crc_field</span><span class="o">.</span><span class="n">packed_checksum</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+                <span class="n">stream</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">checksum_data</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">unpack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">trailing</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="n">stream</span> <span class="o">=</span> <span class="n">BytesIO</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">unpack_stream</span><span class="p">(</span><span class="n">stream</span><span class="p">)</span>
+        <span class="n">stream</span><span class="o">.</span><span class="n">tell</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">trailing</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">stream</span>
+        <span class="k">elif</span> <span class="n">stream</span><span class="o">.</span><span class="n">tell</span><span class="p">()</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">SuitcaseParseError</span><span class="p">(</span><span class="s">&quot;Structure fully parsed but additional bytes remained.  Parsing &quot;</span>
+                                     <span class="s">&quot;consumed </span><span class="si">%d</span><span class="s"> of </span><span class="si">%d</span><span class="s"> bytes&quot;</span> <span class="o">%</span>
+                                     <span class="p">(</span><span class="n">stream</span><span class="o">.</span><span class="n">tell</span><span class="p">(),</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)))</span>
+
+<div class="viewcode-block" id="Packer.unpack_stream"><a class="viewcode-back" href="../../api.html#suitcase.structure.Packer.unpack_stream">[docs]</a>    <span class="k">def</span> <span class="nf">unpack_stream</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Unpack bytes from a stream of data field-by-field</span>
+
+<span class="sd">        In the most basic case, the basic algorithm here is as follows::</span>
+
+<span class="sd">            for _name, field in self.ordered_fields:</span>
+<span class="sd">               length = field.bytes_required</span>
+<span class="sd">               data = stream.read(length)</span>
+<span class="sd">               field.unpack(data)</span>
+
+<span class="sd">        This logic is complicated somewhat by the handling of variable length</span>
+<span class="sd">        greedy fields (there may only be one).  The logic when we see a</span>
+<span class="sd">        greedy field (bytes_required returns None) in the stream is to</span>
+<span class="sd">        pivot and parse the remaining fields starting from the last and</span>
+<span class="sd">        moving through the stream backwards.  There is also some special</span>
+<span class="sd">        logic present for dealing with checksum fields.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">crc_fields</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">greedy_field</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="c"># go through the fields from first to last.  If we hit a greedy</span>
+        <span class="c"># field, break out of the loop</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">field</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ordered_fields</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">CRCField</span><span class="p">):</span>
+                <span class="n">crc_fields</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">field</span><span class="p">,</span> <span class="n">stream</span><span class="o">.</span><span class="n">tell</span><span class="p">()))</span>
+            <span class="n">length</span> <span class="o">=</span> <span class="n">field</span><span class="o">.</span><span class="n">bytes_required</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">SubstructureField</span><span class="p">):</span>
+                <span class="n">remaining_data</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()[</span><span class="n">stream</span><span class="o">.</span><span class="n">tell</span><span class="p">():]</span>
+                <span class="n">returned_stream</span> <span class="o">=</span> <span class="n">field</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="n">remaining_data</span><span class="p">,</span> <span class="n">trailing</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+                <span class="c"># We need to fast forward by as much as was consumed by the structure</span>
+                <span class="n">stream</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="n">stream</span><span class="o">.</span><span class="n">tell</span><span class="p">()</span> <span class="o">+</span> <span class="n">returned_stream</span><span class="o">.</span><span class="n">tell</span><span class="p">())</span>
+                <span class="k">continue</span>
+            <span class="k">elif</span> <span class="n">length</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+                <span class="n">greedy_field</span> <span class="o">=</span> <span class="n">field</span>
+                <span class="k">break</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">length</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">!=</span> <span class="n">length</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">SuitcaseParseError</span><span class="p">(</span><span class="s">&quot;While attempting to parse field &quot;</span>
+                                             <span class="s">&quot;</span><span class="si">%r</span><span class="s"> we tried to read </span><span class="si">%s</span><span class="s"> bytes but &quot;</span>
+                                             <span class="s">&quot;we were only able to read </span><span class="si">%s</span><span class="s">.&quot;</span> <span class="o">%</span>
+                                             <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">length</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)))</span>
+
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">field</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+            <span class="k">except</span> <span class="n">SuitcaseException</span><span class="p">:</span>
+                <span class="k">raise</span>  <span class="c"># just re-raise these</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="n">exc_value</span> <span class="o">=</span> <span class="n">SuitcaseParseError</span><span class="p">(</span><span class="s">&quot;Unexpected exception while unpacking field </span><span class="si">%r</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">name</span><span class="p">)</span>
+                <span class="n">six</span><span class="o">.</span><span class="n">reraise</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">exc_value</span><span class="p">),</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()[</span><span class="mi">2</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="n">greedy_field</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">remaining_data</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+            <span class="n">inverted_stream</span> <span class="o">=</span> <span class="n">BytesIO</span><span class="p">(</span><span class="n">remaining_data</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+
+            <span class="c"># work through the remaining fields in reverse order in order</span>
+            <span class="c"># to narrow in on the right bytes for the greedy field</span>
+            <span class="n">reversed_remaining_fields</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ordered_fields</span><span class="p">[(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):][::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">_name</span><span class="p">,</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">reversed_remaining_fields</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">CRCField</span><span class="p">):</span>
+                    <span class="n">crc_fields</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                        <span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="o">-</span><span class="n">inverted_stream</span><span class="o">.</span><span class="n">tell</span><span class="p">()</span> <span class="o">-</span> <span class="n">field</span><span class="o">.</span><span class="n">bytes_required</span><span class="p">))</span>
+                <span class="n">length</span> <span class="o">=</span> <span class="n">field</span><span class="o">.</span><span class="n">bytes_required</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="n">inverted_stream</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">length</span><span class="p">)[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">!=</span> <span class="n">length</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">SuitcaseParseError</span><span class="p">(</span><span class="s">&quot;While attempting to parse field &quot;</span>
+                                             <span class="s">&quot;</span><span class="si">%r</span><span class="s"> we tried to read </span><span class="si">%s</span><span class="s"> bytes but &quot;</span>
+                                             <span class="s">&quot;we were only able to read </span><span class="si">%s</span><span class="s">.&quot;</span> <span class="o">%</span>
+                                             <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">length</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)))</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">field</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+                <span class="k">except</span> <span class="n">SuitcaseException</span><span class="p">:</span>
+                    <span class="k">raise</span>  <span class="c"># just re-raise these</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                    <span class="n">exc_value</span> <span class="o">=</span> <span class="n">SuitcaseParseError</span><span class="p">(</span><span class="s">&quot;Unexpected exception while unpacking field </span><span class="si">%r</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">name</span><span class="p">)</span>
+                    <span class="n">six</span><span class="o">.</span><span class="n">reraise</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">exc_value</span><span class="p">),</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()[</span><span class="mi">2</span><span class="p">])</span>
+
+            <span class="n">greedy_data_chunk</span> <span class="o">=</span> <span class="n">inverted_stream</span><span class="o">.</span><span class="n">read</span><span class="p">()[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">greedy_field</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="n">greedy_data_chunk</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">crc_fields</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
+            <span class="k">for</span> <span class="p">(</span><span class="n">crc_field</span><span class="p">,</span> <span class="n">offset</span><span class="p">)</span> <span class="ow">in</span> <span class="n">crc_fields</span><span class="p">:</span>
+                <span class="n">crc_field</span><span class="o">.</span><span class="n">validate</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">offset</span><span class="p">)</span>
+
+</div></div>
+<div class="viewcode-block" id="StructureMeta"><a class="viewcode-back" href="../../api.html#suitcase.structure.StructureMeta">[docs]</a><span class="k">class</span> <span class="nc">StructureMeta</span><span class="p">(</span><span class="nb">type</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Metaclass for all structure objects</span>
+
+<span class="sd">    When a class with this metaclass is created, we look for any</span>
+<span class="sd">    FieldProperty instances associated with the class and record</span>
+<span class="sd">    those for use later on.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__new__</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">bases</span><span class="p">,</span> <span class="n">dct</span><span class="p">):</span>
+        <span class="c">#  find all the placeholders in this class declaration and store</span>
+        <span class="c"># them away.  Add name mangling to the original fields so they</span>
+        <span class="c"># do not get in the way.</span>
+        <span class="n">dct</span><span class="p">[</span><span class="s">&#39;_field_placeholders&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">dct</span><span class="p">[</span><span class="s">&#39;_crc_field&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">dct</span><span class="o">.</span><span class="n">items</span><span class="p">()):</span>  <span class="c"># use a copy, we mutate dct</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">FieldPlaceholder</span><span class="p">):</span>
+                <span class="n">dct</span><span class="p">[</span><span class="s">&#39;_field_placeholders&#39;</span><span class="p">][</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+                <span class="n">dct</span><span class="p">[</span><span class="s">&#39;__</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+                <span class="k">del</span> <span class="n">dct</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">value</span><span class="o">.</span><span class="n">cls</span> <span class="o">==</span> <span class="n">CRCField</span><span class="p">:</span>
+                    <span class="n">dct</span><span class="p">[</span><span class="s">&#39;_crc_field&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+
+        <span class="n">sorted_fields</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">dct</span><span class="p">[</span><span class="s">&#39;_field_placeholders&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span>
+                                    <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">kv</span><span class="p">:</span> <span class="n">kv</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">_field_seqno</span><span class="p">))</span>
+        <span class="n">dct</span><span class="p">[</span><span class="s">&#39;_sorted_fields&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">sorted_fields</span>
+        <span class="k">return</span> <span class="nb">type</span><span class="o">.</span><span class="n">__new__</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">bases</span><span class="p">,</span> <span class="n">dct</span><span class="p">)</span>
+
+</div>
+<span class="nd">@six.add_metaclass</span><span class="p">(</span><span class="n">StructureMeta</span><span class="p">)</span>
+<div class="viewcode-block" id="Structure"><a class="viewcode-back" href="../../api.html#suitcase.structure.Structure">[docs]</a><span class="k">class</span> <span class="nc">Structure</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">r&quot;&quot;&quot;Base class for message schema declaration</span>
+
+<span class="sd">    ``Structure`` forms the core of the Suitcase library and allows for</span>
+<span class="sd">    a declarative syntax for specifying packet schemas and associated</span>
+<span class="sd">    methods for transforming these schemas into packed bytes (and vice-versa).</span>
+
+<span class="sd">    Here&#39;s an example showing how one might specify the format for a UDP</span>
+<span class="sd">    Datagram::</span>
+
+
+<span class="sd">        &gt;&gt;&gt; from suitcase.fields import UBInt16, LengthField, VariableRawPayload</span>
+<span class="sd">        &gt;&gt;&gt; class UDPDatagram(Structure):</span>
+<span class="sd">        ...     source_port = UBInt16()</span>
+<span class="sd">        ...     destination_port = UBInt16()</span>
+<span class="sd">        ...     length = LengthField(UBInt16())</span>
+<span class="sd">        ...     checksum = UBInt16()</span>
+<span class="sd">        ...     data = VariableRawPayload(length)</span>
+
+<span class="sd">    From this we have a near-ideal form for packing and parsing packet</span>
+<span class="sd">    data following the schema::</span>
+
+<span class="sd">        &gt;&gt;&gt; def printb(s):</span>
+<span class="sd">        ...     print(repr(s).replace(&quot;b&#39;&quot;, &quot;&#39;&quot;).replace(&quot;u&#39;&quot;, &quot;&#39;&quot;))</span>
+<span class="sd">        ...</span>
+<span class="sd">        &gt;&gt;&gt; dgram = UDPDatagram()</span>
+<span class="sd">        &gt;&gt;&gt; dgram.source_port = 9110</span>
+<span class="sd">        &gt;&gt;&gt; dgram.destination_port = 1001</span>
+<span class="sd">        &gt;&gt;&gt; dgram.checksum = 27193</span>
+<span class="sd">        &gt;&gt;&gt; dgram.data = b&quot;Hello, world!&quot;</span>
+<span class="sd">        &gt;&gt;&gt; printb(dgram.pack())</span>
+<span class="sd">        &#39;#\x96\x03\xe9\x00\rj9Hello, world!&#39;</span>
+<span class="sd">        &gt;&gt;&gt; dgram2 = UDPDatagram()</span>
+<span class="sd">        &gt;&gt;&gt; dgram2.unpack(dgram.pack())</span>
+<span class="sd">        &gt;&gt;&gt; dgram2</span>
+<span class="sd">        UDPDatagram (</span>
+<span class="sd">          source_port=9110,</span>
+<span class="sd">          destination_port=1001,</span>
+<span class="sd">          length=13,</span>
+<span class="sd">          checksum=27193,</span>
+<span class="sd">          data=...&#39;Hello, world!&#39;,</span>
+<span class="sd">        )</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="nd">@classmethod</span>
+<div class="viewcode-block" id="Structure.from_data"><a class="viewcode-back" href="../../api.html#suitcase.structure.Structure.from_data">[docs]</a>    <span class="k">def</span> <span class="nf">from_data</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Create a new, populated message from some data</span>
+
+<span class="sd">        This factory method is identical to doing the following, it just takes</span>
+<span class="sd">        one line instead of two and looks nicer in general::</span>
+
+<span class="sd">            m = MyMessage()</span>
+<span class="sd">            m.unpack(data)</span>
+
+<span class="sd">        Can be rewritten as just::</span>
+
+<span class="sd">            m = MyMessage.from_data(data)</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">m</span> <span class="o">=</span> <span class="n">cls</span><span class="p">()</span>
+        <span class="n">m</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">m</span>
+</div>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_key_to_field</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_parent</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sorted_fields</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_placeholder_to_field</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">__class__</span><span class="o">.</span><span class="n">_crc_field</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_crc_field</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_crc_field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">__class__</span><span class="o">.</span><span class="n">_crc_field</span><span class="o">.</span><span class="n">create_instance</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">field_placeholder</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">__class__</span><span class="o">.</span><span class="n">_sorted_fields</span><span class="p">:</span>
+            <span class="n">field</span> <span class="o">=</span> <span class="n">field_placeholder</span><span class="o">.</span><span class="n">create_instance</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_key_to_field</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_placeholder_to_field</span><span class="p">[</span><span class="n">field_placeholder</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sorted_fields</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">key</span><span class="p">,</span> <span class="n">field</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_packer</span> <span class="o">=</span> <span class="n">Packer</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_sorted_fields</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crc_field</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__getattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="n">k2f</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">__dict__</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;_key_to_field&#39;</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">k2f</span><span class="p">:</span>
+            <span class="n">field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_key_to_field</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+            <span class="k">return</span> <span class="n">field</span><span class="o">.</span><span class="n">getval</span><span class="p">()</span>
+        <span class="k">raise</span> <span class="ne">AttributeError</span>
+
+    <span class="k">def</span> <span class="nf">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="n">k2f</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">__dict__</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;_key_to_field&#39;</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">k2f</span><span class="p">:</span>
+            <span class="n">field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_key_to_field</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+            <span class="k">return</span> <span class="n">field</span><span class="o">.</span><span class="n">setval</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">object</span><span class="o">.</span><span class="n">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">iter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_sorted_fields</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="s">&quot;</span><span class="si">%s</span><span class="s"> (</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">__class__</span><span class="o">.</span><span class="n">__name__</span>
+        <span class="k">for</span> <span class="n">field_name</span><span class="p">,</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="n">output</span> <span class="o">+=</span> <span class="s">&quot;  </span><span class="si">%s</span><span class="s">=</span><span class="si">%s</span><span class="s">,</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">field_name</span><span class="p">,</span> <span class="n">field</span><span class="p">)</span>
+        <span class="n">output</span> <span class="o">+=</span> <span class="s">&quot;)&quot;</span>
+        <span class="k">return</span> <span class="n">output</span>
+
+    <span class="k">def</span> <span class="nf">lookup_field_by_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">fname</span><span class="p">,</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="n">fname</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">field</span>
+        <span class="k">raise</span> <span class="ne">KeyError</span>
+
+    <span class="k">def</span> <span class="nf">lookup_field_by_placeholder</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">placeholder</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_placeholder_to_field</span><span class="p">[</span><span class="n">placeholder</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">unpack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">trailing</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_packer</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">trailing</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">pack</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_packer</span><span class="o">.</span><span class="n">pack</span><span class="p">()</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">suitcase</a></h1>
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+</ul>
+
+
+<hr />
+<ul>
+    
+    <li class="toctree-l1"><a href="http://www.digi.com/wireless-design-services/">Digi WDS</a></li>
+    
+    <li class="toctree-l1"><a href="https://github.com/digidotcom/python-suitcase">Suitcase on Github</a></li>
+    
+</ul>
+
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2015, Digi International, Inc..
+      
+    </div>
+
+    
+    <a href="https://github.com/digidotcom/python-suitcase" class="github">
+        <img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub"  class="github"/>
+    </a>
+    
+
+    
+  </body>
+</html>

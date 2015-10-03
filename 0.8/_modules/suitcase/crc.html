@@ -1,0 +1,220 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>suitcase.crc &mdash; suitcase 0.6 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="suitcase 0.6 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" />
+   
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+
+  </head>
+  <body role="document">  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for suitcase.crc</h1><div class="highlight"><pre>
+<span class="c"># This Source Code Form is subject to the terms of the Mozilla Public</span>
+<span class="c"># License, v. 2.0. If a copy of the MPL was not distributed with this</span>
+<span class="c"># file, You can obtain one at http://mozilla.org/MPL/2.0/.</span>
+<span class="c">#</span>
+<span class="c"># Copyright (c) 2015 Digi International Inc. All Rights Reserved.</span>
+
+<span class="sd">&quot;&quot;&quot;A collection of Suitcase CRCField compatible CRC algorithms&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">binascii</span>
+
+<span class="kn">import</span> <span class="nn">six</span>
+
+<span class="c"># Table driver crc16 algorithm.  The table is well-documented and was</span>
+<span class="c"># generated in this case by using pycrc (https://github.com/tpircher/pycrc)</span>
+<span class="c"># using the following command-line:</span>
+<span class="c">#</span>
+<span class="c"># ./pycrc.py --model=ccitt --generate table</span>
+
+<span class="n">CRC16_CCITT_TAB</span> <span class="o">=</span> \
+    <span class="p">[</span>
+        <span class="mh">0x0000</span><span class="p">,</span> <span class="mh">0x1021</span><span class="p">,</span> <span class="mh">0x2042</span><span class="p">,</span> <span class="mh">0x3063</span><span class="p">,</span> <span class="mh">0x4084</span><span class="p">,</span> <span class="mh">0x50a5</span><span class="p">,</span> <span class="mh">0x60c6</span><span class="p">,</span> <span class="mh">0x70e7</span><span class="p">,</span>
+        <span class="mh">0x8108</span><span class="p">,</span> <span class="mh">0x9129</span><span class="p">,</span> <span class="mh">0xa14a</span><span class="p">,</span> <span class="mh">0xb16b</span><span class="p">,</span> <span class="mh">0xc18c</span><span class="p">,</span> <span class="mh">0xd1ad</span><span class="p">,</span> <span class="mh">0xe1ce</span><span class="p">,</span> <span class="mh">0xf1ef</span><span class="p">,</span>
+        <span class="mh">0x1231</span><span class="p">,</span> <span class="mh">0x0210</span><span class="p">,</span> <span class="mh">0x3273</span><span class="p">,</span> <span class="mh">0x2252</span><span class="p">,</span> <span class="mh">0x52b5</span><span class="p">,</span> <span class="mh">0x4294</span><span class="p">,</span> <span class="mh">0x72f7</span><span class="p">,</span> <span class="mh">0x62d6</span><span class="p">,</span>
+        <span class="mh">0x9339</span><span class="p">,</span> <span class="mh">0x8318</span><span class="p">,</span> <span class="mh">0xb37b</span><span class="p">,</span> <span class="mh">0xa35a</span><span class="p">,</span> <span class="mh">0xd3bd</span><span class="p">,</span> <span class="mh">0xc39c</span><span class="p">,</span> <span class="mh">0xf3ff</span><span class="p">,</span> <span class="mh">0xe3de</span><span class="p">,</span>
+        <span class="mh">0x2462</span><span class="p">,</span> <span class="mh">0x3443</span><span class="p">,</span> <span class="mh">0x0420</span><span class="p">,</span> <span class="mh">0x1401</span><span class="p">,</span> <span class="mh">0x64e6</span><span class="p">,</span> <span class="mh">0x74c7</span><span class="p">,</span> <span class="mh">0x44a4</span><span class="p">,</span> <span class="mh">0x5485</span><span class="p">,</span>
+        <span class="mh">0xa56a</span><span class="p">,</span> <span class="mh">0xb54b</span><span class="p">,</span> <span class="mh">0x8528</span><span class="p">,</span> <span class="mh">0x9509</span><span class="p">,</span> <span class="mh">0xe5ee</span><span class="p">,</span> <span class="mh">0xf5cf</span><span class="p">,</span> <span class="mh">0xc5ac</span><span class="p">,</span> <span class="mh">0xd58d</span><span class="p">,</span>
+        <span class="mh">0x3653</span><span class="p">,</span> <span class="mh">0x2672</span><span class="p">,</span> <span class="mh">0x1611</span><span class="p">,</span> <span class="mh">0x0630</span><span class="p">,</span> <span class="mh">0x76d7</span><span class="p">,</span> <span class="mh">0x66f6</span><span class="p">,</span> <span class="mh">0x5695</span><span class="p">,</span> <span class="mh">0x46b4</span><span class="p">,</span>
+        <span class="mh">0xb75b</span><span class="p">,</span> <span class="mh">0xa77a</span><span class="p">,</span> <span class="mh">0x9719</span><span class="p">,</span> <span class="mh">0x8738</span><span class="p">,</span> <span class="mh">0xf7df</span><span class="p">,</span> <span class="mh">0xe7fe</span><span class="p">,</span> <span class="mh">0xd79d</span><span class="p">,</span> <span class="mh">0xc7bc</span><span class="p">,</span>
+        <span class="mh">0x48c4</span><span class="p">,</span> <span class="mh">0x58e5</span><span class="p">,</span> <span class="mh">0x6886</span><span class="p">,</span> <span class="mh">0x78a7</span><span class="p">,</span> <span class="mh">0x0840</span><span class="p">,</span> <span class="mh">0x1861</span><span class="p">,</span> <span class="mh">0x2802</span><span class="p">,</span> <span class="mh">0x3823</span><span class="p">,</span>
+        <span class="mh">0xc9cc</span><span class="p">,</span> <span class="mh">0xd9ed</span><span class="p">,</span> <span class="mh">0xe98e</span><span class="p">,</span> <span class="mh">0xf9af</span><span class="p">,</span> <span class="mh">0x8948</span><span class="p">,</span> <span class="mh">0x9969</span><span class="p">,</span> <span class="mh">0xa90a</span><span class="p">,</span> <span class="mh">0xb92b</span><span class="p">,</span>
+        <span class="mh">0x5af5</span><span class="p">,</span> <span class="mh">0x4ad4</span><span class="p">,</span> <span class="mh">0x7ab7</span><span class="p">,</span> <span class="mh">0x6a96</span><span class="p">,</span> <span class="mh">0x1a71</span><span class="p">,</span> <span class="mh">0x0a50</span><span class="p">,</span> <span class="mh">0x3a33</span><span class="p">,</span> <span class="mh">0x2a12</span><span class="p">,</span>
+        <span class="mh">0xdbfd</span><span class="p">,</span> <span class="mh">0xcbdc</span><span class="p">,</span> <span class="mh">0xfbbf</span><span class="p">,</span> <span class="mh">0xeb9e</span><span class="p">,</span> <span class="mh">0x9b79</span><span class="p">,</span> <span class="mh">0x8b58</span><span class="p">,</span> <span class="mh">0xbb3b</span><span class="p">,</span> <span class="mh">0xab1a</span><span class="p">,</span>
+        <span class="mh">0x6ca6</span><span class="p">,</span> <span class="mh">0x7c87</span><span class="p">,</span> <span class="mh">0x4ce4</span><span class="p">,</span> <span class="mh">0x5cc5</span><span class="p">,</span> <span class="mh">0x2c22</span><span class="p">,</span> <span class="mh">0x3c03</span><span class="p">,</span> <span class="mh">0x0c60</span><span class="p">,</span> <span class="mh">0x1c41</span><span class="p">,</span>
+        <span class="mh">0xedae</span><span class="p">,</span> <span class="mh">0xfd8f</span><span class="p">,</span> <span class="mh">0xcdec</span><span class="p">,</span> <span class="mh">0xddcd</span><span class="p">,</span> <span class="mh">0xad2a</span><span class="p">,</span> <span class="mh">0xbd0b</span><span class="p">,</span> <span class="mh">0x8d68</span><span class="p">,</span> <span class="mh">0x9d49</span><span class="p">,</span>
+        <span class="mh">0x7e97</span><span class="p">,</span> <span class="mh">0x6eb6</span><span class="p">,</span> <span class="mh">0x5ed5</span><span class="p">,</span> <span class="mh">0x4ef4</span><span class="p">,</span> <span class="mh">0x3e13</span><span class="p">,</span> <span class="mh">0x2e32</span><span class="p">,</span> <span class="mh">0x1e51</span><span class="p">,</span> <span class="mh">0x0e70</span><span class="p">,</span>
+        <span class="mh">0xff9f</span><span class="p">,</span> <span class="mh">0xefbe</span><span class="p">,</span> <span class="mh">0xdfdd</span><span class="p">,</span> <span class="mh">0xcffc</span><span class="p">,</span> <span class="mh">0xbf1b</span><span class="p">,</span> <span class="mh">0xaf3a</span><span class="p">,</span> <span class="mh">0x9f59</span><span class="p">,</span> <span class="mh">0x8f78</span><span class="p">,</span>
+        <span class="mh">0x9188</span><span class="p">,</span> <span class="mh">0x81a9</span><span class="p">,</span> <span class="mh">0xb1ca</span><span class="p">,</span> <span class="mh">0xa1eb</span><span class="p">,</span> <span class="mh">0xd10c</span><span class="p">,</span> <span class="mh">0xc12d</span><span class="p">,</span> <span class="mh">0xf14e</span><span class="p">,</span> <span class="mh">0xe16f</span><span class="p">,</span>
+        <span class="mh">0x1080</span><span class="p">,</span> <span class="mh">0x00a1</span><span class="p">,</span> <span class="mh">0x30c2</span><span class="p">,</span> <span class="mh">0x20e3</span><span class="p">,</span> <span class="mh">0x5004</span><span class="p">,</span> <span class="mh">0x4025</span><span class="p">,</span> <span class="mh">0x7046</span><span class="p">,</span> <span class="mh">0x6067</span><span class="p">,</span>
+        <span class="mh">0x83b9</span><span class="p">,</span> <span class="mh">0x9398</span><span class="p">,</span> <span class="mh">0xa3fb</span><span class="p">,</span> <span class="mh">0xb3da</span><span class="p">,</span> <span class="mh">0xc33d</span><span class="p">,</span> <span class="mh">0xd31c</span><span class="p">,</span> <span class="mh">0xe37f</span><span class="p">,</span> <span class="mh">0xf35e</span><span class="p">,</span>
+        <span class="mh">0x02b1</span><span class="p">,</span> <span class="mh">0x1290</span><span class="p">,</span> <span class="mh">0x22f3</span><span class="p">,</span> <span class="mh">0x32d2</span><span class="p">,</span> <span class="mh">0x4235</span><span class="p">,</span> <span class="mh">0x5214</span><span class="p">,</span> <span class="mh">0x6277</span><span class="p">,</span> <span class="mh">0x7256</span><span class="p">,</span>
+        <span class="mh">0xb5ea</span><span class="p">,</span> <span class="mh">0xa5cb</span><span class="p">,</span> <span class="mh">0x95a8</span><span class="p">,</span> <span class="mh">0x8589</span><span class="p">,</span> <span class="mh">0xf56e</span><span class="p">,</span> <span class="mh">0xe54f</span><span class="p">,</span> <span class="mh">0xd52c</span><span class="p">,</span> <span class="mh">0xc50d</span><span class="p">,</span>
+        <span class="mh">0x34e2</span><span class="p">,</span> <span class="mh">0x24c3</span><span class="p">,</span> <span class="mh">0x14a0</span><span class="p">,</span> <span class="mh">0x0481</span><span class="p">,</span> <span class="mh">0x7466</span><span class="p">,</span> <span class="mh">0x6447</span><span class="p">,</span> <span class="mh">0x5424</span><span class="p">,</span> <span class="mh">0x4405</span><span class="p">,</span>
+        <span class="mh">0xa7db</span><span class="p">,</span> <span class="mh">0xb7fa</span><span class="p">,</span> <span class="mh">0x8799</span><span class="p">,</span> <span class="mh">0x97b8</span><span class="p">,</span> <span class="mh">0xe75f</span><span class="p">,</span> <span class="mh">0xf77e</span><span class="p">,</span> <span class="mh">0xc71d</span><span class="p">,</span> <span class="mh">0xd73c</span><span class="p">,</span>
+        <span class="mh">0x26d3</span><span class="p">,</span> <span class="mh">0x36f2</span><span class="p">,</span> <span class="mh">0x0691</span><span class="p">,</span> <span class="mh">0x16b0</span><span class="p">,</span> <span class="mh">0x6657</span><span class="p">,</span> <span class="mh">0x7676</span><span class="p">,</span> <span class="mh">0x4615</span><span class="p">,</span> <span class="mh">0x5634</span><span class="p">,</span>
+        <span class="mh">0xd94c</span><span class="p">,</span> <span class="mh">0xc96d</span><span class="p">,</span> <span class="mh">0xf90e</span><span class="p">,</span> <span class="mh">0xe92f</span><span class="p">,</span> <span class="mh">0x99c8</span><span class="p">,</span> <span class="mh">0x89e9</span><span class="p">,</span> <span class="mh">0xb98a</span><span class="p">,</span> <span class="mh">0xa9ab</span><span class="p">,</span>
+        <span class="mh">0x5844</span><span class="p">,</span> <span class="mh">0x4865</span><span class="p">,</span> <span class="mh">0x7806</span><span class="p">,</span> <span class="mh">0x6827</span><span class="p">,</span> <span class="mh">0x18c0</span><span class="p">,</span> <span class="mh">0x08e1</span><span class="p">,</span> <span class="mh">0x3882</span><span class="p">,</span> <span class="mh">0x28a3</span><span class="p">,</span>
+        <span class="mh">0xcb7d</span><span class="p">,</span> <span class="mh">0xdb5c</span><span class="p">,</span> <span class="mh">0xeb3f</span><span class="p">,</span> <span class="mh">0xfb1e</span><span class="p">,</span> <span class="mh">0x8bf9</span><span class="p">,</span> <span class="mh">0x9bd8</span><span class="p">,</span> <span class="mh">0xabbb</span><span class="p">,</span> <span class="mh">0xbb9a</span><span class="p">,</span>
+        <span class="mh">0x4a75</span><span class="p">,</span> <span class="mh">0x5a54</span><span class="p">,</span> <span class="mh">0x6a37</span><span class="p">,</span> <span class="mh">0x7a16</span><span class="p">,</span> <span class="mh">0x0af1</span><span class="p">,</span> <span class="mh">0x1ad0</span><span class="p">,</span> <span class="mh">0x2ab3</span><span class="p">,</span> <span class="mh">0x3a92</span><span class="p">,</span>
+        <span class="mh">0xfd2e</span><span class="p">,</span> <span class="mh">0xed0f</span><span class="p">,</span> <span class="mh">0xdd6c</span><span class="p">,</span> <span class="mh">0xcd4d</span><span class="p">,</span> <span class="mh">0xbdaa</span><span class="p">,</span> <span class="mh">0xad8b</span><span class="p">,</span> <span class="mh">0x9de8</span><span class="p">,</span> <span class="mh">0x8dc9</span><span class="p">,</span>
+        <span class="mh">0x7c26</span><span class="p">,</span> <span class="mh">0x6c07</span><span class="p">,</span> <span class="mh">0x5c64</span><span class="p">,</span> <span class="mh">0x4c45</span><span class="p">,</span> <span class="mh">0x3ca2</span><span class="p">,</span> <span class="mh">0x2c83</span><span class="p">,</span> <span class="mh">0x1ce0</span><span class="p">,</span> <span class="mh">0x0cc1</span><span class="p">,</span>
+        <span class="mh">0xef1f</span><span class="p">,</span> <span class="mh">0xff3e</span><span class="p">,</span> <span class="mh">0xcf5d</span><span class="p">,</span> <span class="mh">0xdf7c</span><span class="p">,</span> <span class="mh">0xaf9b</span><span class="p">,</span> <span class="mh">0xbfba</span><span class="p">,</span> <span class="mh">0x8fd9</span><span class="p">,</span> <span class="mh">0x9ff8</span><span class="p">,</span>
+        <span class="mh">0x6e17</span><span class="p">,</span> <span class="mh">0x7e36</span><span class="p">,</span> <span class="mh">0x4e55</span><span class="p">,</span> <span class="mh">0x5e74</span><span class="p">,</span> <span class="mh">0x2e93</span><span class="p">,</span> <span class="mh">0x3eb2</span><span class="p">,</span> <span class="mh">0x0ed1</span><span class="p">,</span> <span class="mh">0x1ef0</span>
+    <span class="p">]</span>
+
+<span class="n">CRC16_KERMIT_TAB</span> <span class="o">=</span> \
+    <span class="p">[</span>
+        <span class="mh">0x0000</span><span class="p">,</span> <span class="mh">0x1189</span><span class="p">,</span> <span class="mh">0x2312</span><span class="p">,</span> <span class="mh">0x329b</span><span class="p">,</span> <span class="mh">0x4624</span><span class="p">,</span> <span class="mh">0x57ad</span><span class="p">,</span> <span class="mh">0x6536</span><span class="p">,</span> <span class="mh">0x74bf</span><span class="p">,</span>
+        <span class="mh">0x8c48</span><span class="p">,</span> <span class="mh">0x9dc1</span><span class="p">,</span> <span class="mh">0xaf5a</span><span class="p">,</span> <span class="mh">0xbed3</span><span class="p">,</span> <span class="mh">0xca6c</span><span class="p">,</span> <span class="mh">0xdbe5</span><span class="p">,</span> <span class="mh">0xe97e</span><span class="p">,</span> <span class="mh">0xf8f7</span><span class="p">,</span>
+        <span class="mh">0x1081</span><span class="p">,</span> <span class="mh">0x0108</span><span class="p">,</span> <span class="mh">0x3393</span><span class="p">,</span> <span class="mh">0x221a</span><span class="p">,</span> <span class="mh">0x56a5</span><span class="p">,</span> <span class="mh">0x472c</span><span class="p">,</span> <span class="mh">0x75b7</span><span class="p">,</span> <span class="mh">0x643e</span><span class="p">,</span>
+        <span class="mh">0x9cc9</span><span class="p">,</span> <span class="mh">0x8d40</span><span class="p">,</span> <span class="mh">0xbfdb</span><span class="p">,</span> <span class="mh">0xae52</span><span class="p">,</span> <span class="mh">0xdaed</span><span class="p">,</span> <span class="mh">0xcb64</span><span class="p">,</span> <span class="mh">0xf9ff</span><span class="p">,</span> <span class="mh">0xe876</span><span class="p">,</span>
+        <span class="mh">0x2102</span><span class="p">,</span> <span class="mh">0x308b</span><span class="p">,</span> <span class="mh">0x0210</span><span class="p">,</span> <span class="mh">0x1399</span><span class="p">,</span> <span class="mh">0x6726</span><span class="p">,</span> <span class="mh">0x76af</span><span class="p">,</span> <span class="mh">0x4434</span><span class="p">,</span> <span class="mh">0x55bd</span><span class="p">,</span>
+        <span class="mh">0xad4a</span><span class="p">,</span> <span class="mh">0xbcc3</span><span class="p">,</span> <span class="mh">0x8e58</span><span class="p">,</span> <span class="mh">0x9fd1</span><span class="p">,</span> <span class="mh">0xeb6e</span><span class="p">,</span> <span class="mh">0xfae7</span><span class="p">,</span> <span class="mh">0xc87c</span><span class="p">,</span> <span class="mh">0xd9f5</span><span class="p">,</span>
+        <span class="mh">0x3183</span><span class="p">,</span> <span class="mh">0x200a</span><span class="p">,</span> <span class="mh">0x1291</span><span class="p">,</span> <span class="mh">0x0318</span><span class="p">,</span> <span class="mh">0x77a7</span><span class="p">,</span> <span class="mh">0x662e</span><span class="p">,</span> <span class="mh">0x54b5</span><span class="p">,</span> <span class="mh">0x453c</span><span class="p">,</span>
+        <span class="mh">0xbdcb</span><span class="p">,</span> <span class="mh">0xac42</span><span class="p">,</span> <span class="mh">0x9ed9</span><span class="p">,</span> <span class="mh">0x8f50</span><span class="p">,</span> <span class="mh">0xfbef</span><span class="p">,</span> <span class="mh">0xea66</span><span class="p">,</span> <span class="mh">0xd8fd</span><span class="p">,</span> <span class="mh">0xc974</span><span class="p">,</span>
+        <span class="mh">0x4204</span><span class="p">,</span> <span class="mh">0x538d</span><span class="p">,</span> <span class="mh">0x6116</span><span class="p">,</span> <span class="mh">0x709f</span><span class="p">,</span> <span class="mh">0x0420</span><span class="p">,</span> <span class="mh">0x15a9</span><span class="p">,</span> <span class="mh">0x2732</span><span class="p">,</span> <span class="mh">0x36bb</span><span class="p">,</span>
+        <span class="mh">0xce4c</span><span class="p">,</span> <span class="mh">0xdfc5</span><span class="p">,</span> <span class="mh">0xed5e</span><span class="p">,</span> <span class="mh">0xfcd7</span><span class="p">,</span> <span class="mh">0x8868</span><span class="p">,</span> <span class="mh">0x99e1</span><span class="p">,</span> <span class="mh">0xab7a</span><span class="p">,</span> <span class="mh">0xbaf3</span><span class="p">,</span>
+        <span class="mh">0x5285</span><span class="p">,</span> <span class="mh">0x430c</span><span class="p">,</span> <span class="mh">0x7197</span><span class="p">,</span> <span class="mh">0x601e</span><span class="p">,</span> <span class="mh">0x14a1</span><span class="p">,</span> <span class="mh">0x0528</span><span class="p">,</span> <span class="mh">0x37b3</span><span class="p">,</span> <span class="mh">0x263a</span><span class="p">,</span>
+        <span class="mh">0xdecd</span><span class="p">,</span> <span class="mh">0xcf44</span><span class="p">,</span> <span class="mh">0xfddf</span><span class="p">,</span> <span class="mh">0xec56</span><span class="p">,</span> <span class="mh">0x98e9</span><span class="p">,</span> <span class="mh">0x8960</span><span class="p">,</span> <span class="mh">0xbbfb</span><span class="p">,</span> <span class="mh">0xaa72</span><span class="p">,</span>
+        <span class="mh">0x6306</span><span class="p">,</span> <span class="mh">0x728f</span><span class="p">,</span> <span class="mh">0x4014</span><span class="p">,</span> <span class="mh">0x519d</span><span class="p">,</span> <span class="mh">0x2522</span><span class="p">,</span> <span class="mh">0x34ab</span><span class="p">,</span> <span class="mh">0x0630</span><span class="p">,</span> <span class="mh">0x17b9</span><span class="p">,</span>
+        <span class="mh">0xef4e</span><span class="p">,</span> <span class="mh">0xfec7</span><span class="p">,</span> <span class="mh">0xcc5c</span><span class="p">,</span> <span class="mh">0xddd5</span><span class="p">,</span> <span class="mh">0xa96a</span><span class="p">,</span> <span class="mh">0xb8e3</span><span class="p">,</span> <span class="mh">0x8a78</span><span class="p">,</span> <span class="mh">0x9bf1</span><span class="p">,</span>
+        <span class="mh">0x7387</span><span class="p">,</span> <span class="mh">0x620e</span><span class="p">,</span> <span class="mh">0x5095</span><span class="p">,</span> <span class="mh">0x411c</span><span class="p">,</span> <span class="mh">0x35a3</span><span class="p">,</span> <span class="mh">0x242a</span><span class="p">,</span> <span class="mh">0x16b1</span><span class="p">,</span> <span class="mh">0x0738</span><span class="p">,</span>
+        <span class="mh">0xffcf</span><span class="p">,</span> <span class="mh">0xee46</span><span class="p">,</span> <span class="mh">0xdcdd</span><span class="p">,</span> <span class="mh">0xcd54</span><span class="p">,</span> <span class="mh">0xb9eb</span><span class="p">,</span> <span class="mh">0xa862</span><span class="p">,</span> <span class="mh">0x9af9</span><span class="p">,</span> <span class="mh">0x8b70</span><span class="p">,</span>
+        <span class="mh">0x8408</span><span class="p">,</span> <span class="mh">0x9581</span><span class="p">,</span> <span class="mh">0xa71a</span><span class="p">,</span> <span class="mh">0xb693</span><span class="p">,</span> <span class="mh">0xc22c</span><span class="p">,</span> <span class="mh">0xd3a5</span><span class="p">,</span> <span class="mh">0xe13e</span><span class="p">,</span> <span class="mh">0xf0b7</span><span class="p">,</span>
+        <span class="mh">0x0840</span><span class="p">,</span> <span class="mh">0x19c9</span><span class="p">,</span> <span class="mh">0x2b52</span><span class="p">,</span> <span class="mh">0x3adb</span><span class="p">,</span> <span class="mh">0x4e64</span><span class="p">,</span> <span class="mh">0x5fed</span><span class="p">,</span> <span class="mh">0x6d76</span><span class="p">,</span> <span class="mh">0x7cff</span><span class="p">,</span>
+        <span class="mh">0x9489</span><span class="p">,</span> <span class="mh">0x8500</span><span class="p">,</span> <span class="mh">0xb79b</span><span class="p">,</span> <span class="mh">0xa612</span><span class="p">,</span> <span class="mh">0xd2ad</span><span class="p">,</span> <span class="mh">0xc324</span><span class="p">,</span> <span class="mh">0xf1bf</span><span class="p">,</span> <span class="mh">0xe036</span><span class="p">,</span>
+        <span class="mh">0x18c1</span><span class="p">,</span> <span class="mh">0x0948</span><span class="p">,</span> <span class="mh">0x3bd3</span><span class="p">,</span> <span class="mh">0x2a5a</span><span class="p">,</span> <span class="mh">0x5ee5</span><span class="p">,</span> <span class="mh">0x4f6c</span><span class="p">,</span> <span class="mh">0x7df7</span><span class="p">,</span> <span class="mh">0x6c7e</span><span class="p">,</span>
+        <span class="mh">0xa50a</span><span class="p">,</span> <span class="mh">0xb483</span><span class="p">,</span> <span class="mh">0x8618</span><span class="p">,</span> <span class="mh">0x9791</span><span class="p">,</span> <span class="mh">0xe32e</span><span class="p">,</span> <span class="mh">0xf2a7</span><span class="p">,</span> <span class="mh">0xc03c</span><span class="p">,</span> <span class="mh">0xd1b5</span><span class="p">,</span>
+        <span class="mh">0x2942</span><span class="p">,</span> <span class="mh">0x38cb</span><span class="p">,</span> <span class="mh">0x0a50</span><span class="p">,</span> <span class="mh">0x1bd9</span><span class="p">,</span> <span class="mh">0x6f66</span><span class="p">,</span> <span class="mh">0x7eef</span><span class="p">,</span> <span class="mh">0x4c74</span><span class="p">,</span> <span class="mh">0x5dfd</span><span class="p">,</span>
+        <span class="mh">0xb58b</span><span class="p">,</span> <span class="mh">0xa402</span><span class="p">,</span> <span class="mh">0x9699</span><span class="p">,</span> <span class="mh">0x8710</span><span class="p">,</span> <span class="mh">0xf3af</span><span class="p">,</span> <span class="mh">0xe226</span><span class="p">,</span> <span class="mh">0xd0bd</span><span class="p">,</span> <span class="mh">0xc134</span><span class="p">,</span>
+        <span class="mh">0x39c3</span><span class="p">,</span> <span class="mh">0x284a</span><span class="p">,</span> <span class="mh">0x1ad1</span><span class="p">,</span> <span class="mh">0x0b58</span><span class="p">,</span> <span class="mh">0x7fe7</span><span class="p">,</span> <span class="mh">0x6e6e</span><span class="p">,</span> <span class="mh">0x5cf5</span><span class="p">,</span> <span class="mh">0x4d7c</span><span class="p">,</span>
+        <span class="mh">0xc60c</span><span class="p">,</span> <span class="mh">0xd785</span><span class="p">,</span> <span class="mh">0xe51e</span><span class="p">,</span> <span class="mh">0xf497</span><span class="p">,</span> <span class="mh">0x8028</span><span class="p">,</span> <span class="mh">0x91a1</span><span class="p">,</span> <span class="mh">0xa33a</span><span class="p">,</span> <span class="mh">0xb2b3</span><span class="p">,</span>
+        <span class="mh">0x4a44</span><span class="p">,</span> <span class="mh">0x5bcd</span><span class="p">,</span> <span class="mh">0x6956</span><span class="p">,</span> <span class="mh">0x78df</span><span class="p">,</span> <span class="mh">0x0c60</span><span class="p">,</span> <span class="mh">0x1de9</span><span class="p">,</span> <span class="mh">0x2f72</span><span class="p">,</span> <span class="mh">0x3efb</span><span class="p">,</span>
+        <span class="mh">0xd68d</span><span class="p">,</span> <span class="mh">0xc704</span><span class="p">,</span> <span class="mh">0xf59f</span><span class="p">,</span> <span class="mh">0xe416</span><span class="p">,</span> <span class="mh">0x90a9</span><span class="p">,</span> <span class="mh">0x8120</span><span class="p">,</span> <span class="mh">0xb3bb</span><span class="p">,</span> <span class="mh">0xa232</span><span class="p">,</span>
+        <span class="mh">0x5ac5</span><span class="p">,</span> <span class="mh">0x4b4c</span><span class="p">,</span> <span class="mh">0x79d7</span><span class="p">,</span> <span class="mh">0x685e</span><span class="p">,</span> <span class="mh">0x1ce1</span><span class="p">,</span> <span class="mh">0x0d68</span><span class="p">,</span> <span class="mh">0x3ff3</span><span class="p">,</span> <span class="mh">0x2e7a</span><span class="p">,</span>
+        <span class="mh">0xe70e</span><span class="p">,</span> <span class="mh">0xf687</span><span class="p">,</span> <span class="mh">0xc41c</span><span class="p">,</span> <span class="mh">0xd595</span><span class="p">,</span> <span class="mh">0xa12a</span><span class="p">,</span> <span class="mh">0xb0a3</span><span class="p">,</span> <span class="mh">0x8238</span><span class="p">,</span> <span class="mh">0x93b1</span><span class="p">,</span>
+        <span class="mh">0x6b46</span><span class="p">,</span> <span class="mh">0x7acf</span><span class="p">,</span> <span class="mh">0x4854</span><span class="p">,</span> <span class="mh">0x59dd</span><span class="p">,</span> <span class="mh">0x2d62</span><span class="p">,</span> <span class="mh">0x3ceb</span><span class="p">,</span> <span class="mh">0x0e70</span><span class="p">,</span> <span class="mh">0x1ff9</span><span class="p">,</span>
+        <span class="mh">0xf78f</span><span class="p">,</span> <span class="mh">0xe606</span><span class="p">,</span> <span class="mh">0xd49d</span><span class="p">,</span> <span class="mh">0xc514</span><span class="p">,</span> <span class="mh">0xb1ab</span><span class="p">,</span> <span class="mh">0xa022</span><span class="p">,</span> <span class="mh">0x92b9</span><span class="p">,</span> <span class="mh">0x8330</span><span class="p">,</span>
+        <span class="mh">0x7bc7</span><span class="p">,</span> <span class="mh">0x6a4e</span><span class="p">,</span> <span class="mh">0x58d5</span><span class="p">,</span> <span class="mh">0x495c</span><span class="p">,</span> <span class="mh">0x3de3</span><span class="p">,</span> <span class="mh">0x2c6a</span><span class="p">,</span> <span class="mh">0x1ef1</span><span class="p">,</span> <span class="mh">0x0f78</span>
+    <span class="p">]</span>
+
+
+<div class="viewcode-block" id="crc16_kermit"><a class="viewcode-back" href="../../api.html#suitcase.crc.crc16_kermit">[docs]</a><span class="k">def</span> <span class="nf">crc16_kermit</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">crc</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Calculate/Updaet the Kermit CRC16 checksum for some data&quot;&quot;&quot;</span>
+    <span class="n">tab</span> <span class="o">=</span> <span class="n">CRC16_KERMIT_TAB</span>  <span class="c"># minor optimization (now in locals)</span>
+    <span class="k">for</span> <span class="n">byte</span> <span class="ow">in</span> <span class="n">six</span><span class="o">.</span><span class="n">iterbytes</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+        <span class="n">tbl_idx</span> <span class="o">=</span> <span class="p">(</span><span class="n">crc</span> <span class="o">^</span> <span class="n">byte</span><span class="p">)</span> <span class="o">&amp;</span> <span class="mh">0xff</span>
+        <span class="n">crc</span> <span class="o">=</span> <span class="p">(</span><span class="n">tab</span><span class="p">[</span><span class="n">tbl_idx</span><span class="p">]</span> <span class="o">^</span> <span class="p">(</span><span class="n">crc</span> <span class="o">&gt;&gt;</span> <span class="mi">8</span><span class="p">))</span> <span class="o">&amp;</span> <span class="mh">0xffff</span>
+    <span class="k">return</span> <span class="n">crc</span> <span class="o">&amp;</span> <span class="mh">0xffff</span>
+
+</div>
+<div class="viewcode-block" id="crc16_ccitt"><a class="viewcode-back" href="../../api.html#suitcase.crc.crc16_ccitt">[docs]</a><span class="k">def</span> <span class="nf">crc16_ccitt</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">crc</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Calculate the crc16 ccitt checksum of some data</span>
+
+<span class="sd">    A starting crc value may be specified if desired.  The input data</span>
+<span class="sd">    is expected to be a sequence of bytes (string) and the output</span>
+<span class="sd">    is an integer in the range (0, 0xFFFF).  No packing is done to the</span>
+<span class="sd">    resultant crc value.  To check the value a checksum, just pass in</span>
+<span class="sd">    the data byes and checksum value.  If the data matches the checksum,</span>
+<span class="sd">    then the resultant checksum from this function should be 0.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">tab</span> <span class="o">=</span> <span class="n">CRC16_CCITT_TAB</span>  <span class="c"># minor optimization (now in locals)</span>
+    <span class="k">for</span> <span class="n">byte</span> <span class="ow">in</span> <span class="n">six</span><span class="o">.</span><span class="n">iterbytes</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+        <span class="n">crc</span> <span class="o">=</span> <span class="p">(((</span><span class="n">crc</span> <span class="o">&lt;&lt;</span> <span class="mi">8</span><span class="p">)</span> <span class="o">&amp;</span> <span class="mh">0xff00</span><span class="p">)</span> <span class="o">^</span> <span class="n">tab</span><span class="p">[((</span><span class="n">crc</span> <span class="o">&gt;&gt;</span> <span class="mi">8</span><span class="p">)</span> <span class="o">&amp;</span> <span class="mh">0xff</span><span class="p">)</span> <span class="o">^</span> <span class="n">byte</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">crc</span> <span class="o">&amp;</span> <span class="mh">0xffff</span>
+
+</div>
+<span class="k">def</span> <span class="nf">crc32</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">crc</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">binascii</span><span class="o">.</span><span class="n">crc32</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">crc</span><span class="p">)</span> <span class="o">&amp;</span> <span class="mh">0xffffffff</span>  <span class="c"># positive sign</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">suitcase</a></h1>
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+</ul>
+
+
+<hr />
+<ul>
+    
+    <li class="toctree-l1"><a href="http://www.digi.com/wireless-design-services/">Digi WDS</a></li>
+    
+    <li class="toctree-l1"><a href="https://github.com/digidotcom/python-suitcase">Suitcase on Github</a></li>
+    
+</ul>
+
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2015, Digi International, Inc..
+      
+    </div>
+
+    
+    <a href="https://github.com/digidotcom/python-suitcase" class="github">
+        <img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub"  class="github"/>
+    </a>
+    
+
+    
+  </body>
+</html>
