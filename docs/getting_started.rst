@@ -26,8 +26,8 @@ Data Modeling
 Suitcase provides a declarative syntax for recording the structure of
 the messages in your problem domain.  The first step is to understand
 those messages and convert each message layer into its correspdonding
-:class:`suitcase.structure.Structure`s and
-:class:`suitcase.fields.Field`s.
+:class:`suitcase.structure.Structure` s and
+:class:`suitcase.fields.BaseField` s.
 
 Typically, you will end up with one structure for each layer of a
 protocol stack, if that is your domain.  For instance, let's say that
