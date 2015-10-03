@@ -1,7 +1,7 @@
 Suitcase
 ========
 
-[![Build Status](https://img.shields.io/travis/digidotcom/python-suitcase.svg)](https://travis-ci.org/digidotcom/python-suitcase)
+[![Build Status](https://travis-ci.org/digidotcom/python-suitcase.svg?branch=master)](https://travis-ci.org/digidotcom/python-suitcase)
 [![Coverage Status](https://img.shields.io/coveralls/digidotcom/python-suitcase.svg)](https://coveralls.io/r/digidotcom/python-suitcase)
 [![Code Climate](https://img.shields.io/codeclimate/github/digidotcom/python-suitcase.svg)](https://codeclimate.com/github/digidotcom/python-suitcase)
 [![Latest Version](https://img.shields.io/pypi/v/suitcase.svg)](https://pypi.python.org/pypi/suitcase/)
