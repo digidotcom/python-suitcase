@@ -20,3 +20,7 @@ install:
 # command to run tests, e.g. python setup.py test
 script:
   - tox -e $TOX_ENV
+
+# allow travis to use new, faster container based
+# infrastructure to perform the testing
+sudo: false
