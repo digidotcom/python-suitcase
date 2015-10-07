@@ -38,6 +38,6 @@ Enhancements:
   several previously impossible use cases that show up frequently in
   practice.
 
-### 0.6 / 2016-06-24
+### 0.6 / 2015-06-24
 
 * Initial Public release of the library
