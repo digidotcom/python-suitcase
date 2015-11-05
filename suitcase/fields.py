@@ -533,7 +533,7 @@ class TypeField(BaseField):
             target_field.pack(sio)
             target_field_length = len(sio.getvalue())
             if target_field_length != self.get_adjusted_length():
-                raise SuitcaseProgrammingError("Payload length %i does not" +
+                raise SuitcaseProgrammingError("Payload length %i does not"
                                                " match length %i specified by type"
                                                % (target_field_length, self.get_adjusted_length()))
             return target_field_length
