@@ -935,7 +935,7 @@ class TestTypeField(unittest.TestCase):
         m = TypeFieldWrongSize()
         m.type = 0x01  # Indicates a length of 2
         m.greedy = b"Hello"
-        self.assertRaises(SuitcasePackException, m.pack)
+        self.assertRaises(SuitcaseProgrammingError, m.pack)
 
 
 # Test SubstructureField
