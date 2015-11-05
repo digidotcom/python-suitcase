@@ -34,6 +34,50 @@ class SuperChild(Structure):
     remaining = VariableRawPayload(length)
 
 
+# See https://github.com/digidotcom/python-suitcase/issues/18
+#
+# This field is setup to test a LengthField with logic for getting/setting
+# the length out of a complicated field (in this case a BitField).
+def _set_length(field, length):
+    field.length = length
+
+
+class BGAPIFrame(Structure):
+    head = LengthField(
+            BitField(16,
+                     is_event=BitBool(),
+                     technology_type=BitNum(4),
+                     length=BitNum(11)),
+            get_length=lambda f: f.length,
+            set_length=_set_length)
+    class_id = UBInt8()
+    command_id = UBInt8()
+    payload = Payload(head)
+
+
+class TestCustomSetGetLengthField(unittest.TestCase):
+
+    def test_unpack(self):
+        frame = BGAPIFrame.from_data(b'\x00\x00\x00\x01')
+        self.assertEqual(frame.head.is_event, False)
+        self.assertEqual(frame.head.technology_type, 0)
+        self.assertEqual(frame.head.length, 0)
+        self.assertEqual(frame.class_id, 0)
+        self.assertEqual(frame.command_id, 1)
+        self.assertEqual(frame.payload, b"")
+
+    def test_pack(self):
+        frame = BGAPIFrame()
+        frame.head.is_event = True
+        frame.head.technology_type = 0b1101
+        frame.class_id = 0x10
+        frame.command_id = 0xFE
+        frame.payload = b"Hello, world!"
+        self.assertEqual(frame.pack(), b'\xe8\r\x10\xfeHello, world!')
+        frame_readback = BGAPIFrame.from_data(frame.pack())
+        self.assertEqual(frame_readback.head.length, len(frame.payload))
+
+
 # Message containing every field
 class SuperMessage(Structure):
     magic = Magic(b'\xAA\xAA')

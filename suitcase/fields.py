@@ -414,6 +414,14 @@ class LengthField(BaseField):
     :param length_field: The field providing the actual length value to
         be used.  This field should return an integer value representing
         the length (or a multiple of the length) as a return value
+    :param get_length: If specified, this is a function which takes a reference
+        to the encapsulated field and is responsible for reading the length
+        out from that field.  By default, this just reads the value of the
+        field (field is expected to be an integral value).
+    :param set_length: If specified, this is a function which takes a reference
+        to the encapsulated field and a length value.  Its responsibility
+        is to move the provided length value into the field.  By default,
+        the length value is just assigned to the field via `setval()`.
     :param multiplier: If specified, this multiplier is applied to the
         length.  If I specify a multiplier of 8, I am saying that each bit
         in the length field represents 8 bytes of actual payload length. By
@@ -421,22 +429,29 @@ class LengthField(BaseField):
 
     """
 
-    def __init__(self, length_field, multiplier=1, **kwargs):
+    def __init__(self, length_field, get_length=None, set_length=None, multiplier=1, **kwargs):
         BaseField.__init__(self, **kwargs)
         self.multiplier = multiplier
+        self.get_length = self._default_get_length if get_length is None else get_length
+        self.set_length = self._default_set_length if set_length is None else set_length
         self.length_field = length_field.create_instance(self._parent)
         self.length_value_provider = None
 
     def __repr__(self):
         return repr(self.length_field)
 
+    def _default_get_length(self, field):
+        return field.getval()
+
+    def _default_set_length(self, field, length):
+        field._value = length  # TODO: use setval() [problem with DependentField tests]?
+
     @property
     def bytes_required(self):
         return self.length_field.bytes_required
 
     def getval(self):
-        length_value = self.length_field.getval()
-        return length_value
+        return self.length_field.getval()
 
     def setval(self, value):
         raise SuitcaseProgrammingError("Cannot set the value of a LengthField")
@@ -456,7 +471,7 @@ class LengthField(BaseField):
     def pack(self, stream):
         if self.length_value_provider is None:
             raise SuitcaseException("No length_provider added to this LengthField")
-        self.length_field._value = self.length_value_provider()
+        self.set_length(self.length_field, self.length_value_provider())
         self.length_field.pack(stream)
 
     def unpack(self, data):
@@ -464,7 +479,7 @@ class LengthField(BaseField):
         return self.length_field.unpack(data)
 
     def get_adjusted_length(self):
-        return self.getval() * self.multiplier
+        return self.get_length(self.length_field) * self.multiplier
 
 
 class TypeField(BaseField):
