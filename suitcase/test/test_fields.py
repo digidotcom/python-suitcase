@@ -35,13 +35,6 @@ class SuperChild(Structure):
 
 
 # See https://github.com/digidotcom/python-suitcase/issues/18
-#
-# This field is setup to test a LengthField with logic for getting/setting
-# the length out of a complicated field (in this case a BitField).
-def _set_length(field, length):
-    field.length = length
-
-
 class BGAPIFrame(Structure):
     head = LengthField(
             BitField(16,
@@ -49,7 +42,7 @@ class BGAPIFrame(Structure):
                      technology_type=BitNum(4),
                      length=BitNum(11)),
             get_length=lambda f: f.length,
-            set_length=_set_length)
+            set_length=lambda f, l: setattr(f, 'length', l))
     class_id = UBInt8()
     command_id = UBInt8()
     payload = Payload(head)
