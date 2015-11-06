@@ -55,7 +55,7 @@ def client():
         request.payload = input
         s.sendall(request.pack())
 
-        # to handle asynchronous messages, this would be done asynchrnonously
+        # to handle asynchronous messages, this would be done asynchronously
         proto_handler.feed(s.recv(1024))
 
 

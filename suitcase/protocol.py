@@ -10,7 +10,7 @@ These protocols all wrap some base message schema and provide
 all the necessary hooks for pushing in a stream of bytes and
 getting out packets in the order they were found.  The protocol
 handlers will also provide notifications of error conditions
-(for instance, unexpected bytes or a bad checksum)
+(for instance, unexpected bytes or a bad checksum).
 
 """
 from functools import partial
@@ -27,12 +27,12 @@ class StreamProtocolHandler(object):
     IO on a serial port).
 
     Here's an example of what one usage might look like (very simple
-    appraoch for parsing a simple tcp protocol::
+    approach for parsing a simple TCP protocol::
 
 
         from suitcase.protocol import StreamProtocolHandler
         from suitcase.fields import LengthField, UBInt16, VariableRawPayload
-        from suitcase.struct import Structure
+        from suitcase.structure import Structure
         import socket
 
         class SimpleFramedMessage(Structure):
@@ -140,7 +140,7 @@ class StreamProtocolHandler(object):
             # behavior be?
             self.reset()
 
-        # callbacks are partials that are boudn to packet already.  We do
+        # callbacks are partials that are bound to packet already.  We do
         # this in order to separate out parsing activity (and error handling)
         # from the execution of callbacks.  Callbacks should not in any way
         # rely on the parsers position in the byte stream.
@@ -151,7 +151,7 @@ class StreamProtocolHandler(object):
         """Reset the internal state machine to a fresh state
 
         If the protocol in use does not properly handle cases of possible
-        desycnronization it might be necessary to issue a reset if bytes
+        de-synchronization it might be necessary to issue a reset if bytes
         are being received but no packets are coming out of the state
         machine.  A reset is issue internally whenever an unexpected exception
         is encountered while processing bytes from the stream.

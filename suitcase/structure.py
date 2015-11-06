@@ -13,7 +13,7 @@ from six import BytesIO
 
 
 class ParseError(Exception):
-    """Exception raied when there is an error parsing"""
+    """Exception raised when there is an error parsing"""
 
 
 class Packer(object):

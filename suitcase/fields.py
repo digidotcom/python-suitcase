@@ -60,7 +60,7 @@ class BaseField(object):
 
     :param instantiate: Create an actual instance instead of a placeholder
     :param parent: Specify the parent of this field (typically a Structure
-        instace).
+        instance).
 
     """
 
@@ -94,7 +94,7 @@ class CRCField(BaseField):
 
     CRC checks and calculation frequently work quite differently
     from other fields in a protocol and as such are treated differently
-    by the messag container.  In particular, a CRCField requires
+    by the message container.  In particular, a CRCField requires
     special steps at either the beginning or end of the message
     pack/unpack process.  For each CRCField, we specify the following:
 
@@ -159,7 +159,7 @@ class CRCField(BaseField):
                 recorded_checksum, actual_checksum, data)
 
     def packed_checksum(self, data):
-        """Given the data of the entire packet reutrn the checksum bytes"""
+        """Given the data of the entire packet return the checksum bytes"""
         self.field.setval(self.algo(data[self.start:self.end]))
         sio = BytesIO()
         self.field.pack(sio)
@@ -235,7 +235,7 @@ class FieldProperty(BaseField):
     :param onget: This is a function pointer to a function called to mutate
         the value returned on field access.  The function receives a single
         argument containing the value of the wrapped field.
-    :oaram onset: This is a functoin pointer to a function called to map
+    :oaram onset: This is a function pointer to a function called to map
         between the property and the underlying field.  The function takes
         a single parameter which is the value the property was set to.  It
         should return the value that the underlying field expects (or raise
@@ -669,7 +669,7 @@ class Payload(BaseField):
         self._value = data
 
 
-# keep for backwards compatability
+# keep for backwards compatibility
 VariableRawPayload = Payload
 
 
@@ -726,7 +726,7 @@ class DependentField(BaseField):
                 0x00: MyDependentMessage,
             })
 
-    :params name: The name of the field from the parent message that we
+    :param name: The name of the field from the parent message that we
         would like brought into our message namespace.
 
     """
@@ -919,10 +919,10 @@ class BaseStructField(BaseField):
     It is expected that this class will be subclassed and customized by
     defining ``FORMAT`` at the class level.  ``FORMAT`` is expected to
     be a format string that could be used with struct.pack/unpack.  It
-    should include endianess information.  If the ``FORMAT`` includes
+    should include endianness information.  If the ``FORMAT`` includes
     multiple elements, the default ``_unpack`` logic assumes that each
     element is a single byte and will OR these together.  To specialize
-    this, _unpack should be overriden.
+    this, _unpack should be overridden.
 
     """
 

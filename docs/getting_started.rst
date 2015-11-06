@@ -10,8 +10,8 @@ Suitcase may be installed directly from `PyPi
 
     pip install suitcase
 
-This will install the library as well as any libraries dependended on
-by suitcase.
+This will install the library as well as any libraries depended on
+by Suitcase.
 
 The library is tested to work on the following python versions:
 
@@ -25,7 +25,7 @@ Data Modeling
 
 Suitcase provides a declarative syntax for recording the structure of
 the messages in your problem domain.  The first step is to understand
-those messages and convert each message layer into its correspdonding
+those messages and convert each message layer into its corresponding
 :class:`suitcase.structure.Structure` s and
 :class:`suitcase.fields.BaseField` s.
 
@@ -35,7 +35,7 @@ we wanted to parser and/or pack `DNS messsages
 <https://en.wikipedia.org/wiki/Domain_Name_System#DNS_message_format>`_.
 
 With just a little reading, we see that each DNS request and response
-has a common form which can be declared in suitcase with the following
+has a common form which can be declared in Suitcase with the following
 structure:
 
 .. literalinclude:: ../suitcase/examples/dns.py
@@ -55,9 +55,9 @@ Wikipedia page describing the same message.
 Using the Model
 ---------------
 
-The structure above provides suitcase with a wealth of information
+The structure above provides Suitcase with a wealth of information
 about the names, sizes, order, and relationship between different
-elements in a `DNSMessage`.  That knowledge is enough so that suitcase
+elements in a `DNSMessage`.  That knowledge is enough so that Suitcase
 can now both pack (generate bytes from and object) and parse (generate
 an object from bytes) for our message.
 
@@ -115,6 +115,6 @@ This generates a string like this::
 Working With Streams
 --------------------
 
-In addition to being able to parse and pack messages, suitcase also includes
-helpers that make working with stream-based protocols (e.g. TCP, Serial Port, etc).
+In addition to being able to parse and pack messages, Suitcase also includes
+helpers that make working with stream-based protocols (e.g. TCP, Serial Port, etc.)
 much easier.  See the API documentation for more details.

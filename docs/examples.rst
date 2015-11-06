@@ -5,7 +5,7 @@ Packetized TCP Server and Client
 --------------------------------
 
 The following example shows an example of a protocol on TCP which has
-a length field and a payload of ``length`` bytes.  With suitcase, we
+a length field and a payload of ``length`` bytes.  With Suitcase, we
 only need to declare the basic structure of the message and we get a
 packer and a stream protocol handler out of the library with very
 little effort.

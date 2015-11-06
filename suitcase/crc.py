@@ -89,7 +89,7 @@ CRC16_KERMIT_TAB = \
 
 
 def crc16_kermit(data, crc=0):
-    """Calculate/Updaet the Kermit CRC16 checksum for some data"""
+    """Calculate/Update the Kermit CRC16 checksum for some data"""
     tab = CRC16_KERMIT_TAB  # minor optimization (now in locals)
     for byte in six.iterbytes(data):
         tbl_idx = (crc ^ byte) & 0xff
