@@ -652,6 +652,22 @@ class ConditionalLength(Structure):
     f3 = ConditionalField(Payload(length_provider=f2), lambda m: m.f1 == 255)
 
 
+# message body that is empty
+class EmptyStructure(Structure):
+    pass
+
+
+# message where f3 is only defined if f2 is 255,
+# and f3 is a dispatch target based on f1
+class ConditionalDispatch(Structure):
+    f1 = DispatchField(UBInt8())
+    f2 = UBInt8()  # separate from f1
+    length = LengthField(UBInt8())
+    f3 = ConditionalField(
+            DispatchTarget(length, f1, {0: EmptyStructure, 1: BasicMessage}),
+            condition=lambda m: m.f2 == 255)
+
+
 class TestConditionalField(unittest.TestCase):
     def test_conditional_pack(self):
         m1 = Conditional()
@@ -696,6 +712,25 @@ class TestConditionalField(unittest.TestCase):
         self.assertEqual(m2.f1, 0xff)
         self.assertEqual(m2.f2, 0x05)
         self.assertEqual(m2.f3, b'\x01\x02\x03\x04\x05')
+
+    def test_conditional_dispatch(self):
+        # Dispatch to an empty structure
+        m1 = ConditionalDispatch()
+        m1.unpack(b'\x00\xff\x00')
+        self.assertEqual(m1.f1, 0)
+        self.assertEqual(m1.f2, 255)
+        self.assertEqual(m1.length, 0)
+        self.assertIsInstance(m1.f3, EmptyStructure)
+
+        # Dispatch to a non-empty structure
+        m2 = ConditionalDispatch()
+        m2.unpack(b'\x01\xff\x02\x11\x22')
+        self.assertEqual(m2.f1, 1)
+        self.assertEqual(m2.f2, 255)
+        self.assertEqual(m2.length, 2)
+        self.assertIsInstance(m2.f3, BasicMessage)
+        self.assertEqual(m2.f3.b1, 0x11)
+        self.assertEqual(m2.f3.b2, 0x22)
 
 
 class TestStructure(unittest.TestCase):

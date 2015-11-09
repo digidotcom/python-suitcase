@@ -615,7 +615,7 @@ class ConditionalField(BaseField):
     def unpack(self, data):
         # length of data will be determined by bytes_required output value
         # which is in turn determined by our condition evaluation
-        if len(data) > 0:
+        if self.condition(self._parent):
             self.field.unpack(data)
 
     def getval(self):
