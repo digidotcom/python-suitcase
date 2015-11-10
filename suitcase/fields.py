@@ -613,8 +613,6 @@ class ConditionalField(BaseField):
             self.field.pack(stream)
 
     def unpack(self, data):
-        # length of data will be determined by bytes_required output value
-        # which is in turn determined by our condition evaluation
         if self.condition(self._parent):
             self.field.unpack(data)
 
