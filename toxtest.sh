@@ -9,7 +9,8 @@
 pyversions=(2.7.10
             3.3.5
             3.4.3
-            pypy-2.6.0
+            3.5.0
+            pypy-4.0.0
             pypy3-2.4.0)
 
 # parse options
@@ -22,7 +23,7 @@ do
     esac
 done
 
-if [ ! FAST="YES" ]; then
+if [ ! "$FAST" = "YES" ]; then
     # first make sure that pyenv is installed
     if [ ! -s "$HOME/.pyenv/bin/pyenv" ]; then
         curl -L https://raw.githubusercontent.com/yyuu/pyenv-installer/master/bin/pyenv-installer | bash
@@ -47,15 +48,15 @@ pyenv rehash
 pyenv global ${pyversions[*]}
 
 # Now, run the tests after sourcing venv for tox install/use
-if [ ! FAST="YES" ]; then
+if [ ! "$FAST" = "YES" ]; then
     virtualenv -q .toxenv
 fi
 source .toxenv/bin/activate
-if [ ! FAST="YES" ]; then
+if [ ! "$FAST" = "YES" ]; then
     pip install -q -r dev-requirements.txt
 fi
 
-if FAST="YES"; then
+if [ "$FAST" = "YES" ]; then
     tox
 else
     # will ensure all depencies are pulled in
