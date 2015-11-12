@@ -1,5 +1,22 @@
 ## Suitcase Change Log
 
+### 0.9 / 2015-11-12
+[Full Changelog](https://github.com/digidotcom/python-suitcase/compare/0.8...0.9)
+
+Bug Fixes:
+
+* Fixed error message when building exception in TypeField
+* Miscellaneous documentation fixes
+* `ConditionalField` now properly works with empty fields without
+  acting like those fields are not present at all.
+
+Enhancements:
+
+* Python 3.5 is now officially supported as is pypy 4.0.0
+* You can now specifies functions that customize how get/set works on
+  `LengthField`.  This allows for things like having the field that
+  provides length to be within a `BitField`.
+
 ### 0.8 / 2015-10-02
 [Full Changelog](https://github.com/digidotcom/python-suitcase/compare/0.7...0.8)
 

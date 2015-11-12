@@ -1,6 +1,5 @@
 --editable .
 
-pyandoc
 nose
 mock
 sphinx
