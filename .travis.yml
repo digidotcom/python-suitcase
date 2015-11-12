@@ -2,7 +2,7 @@ language: python
 
 # this version of python is only used to run tox - the version specified by TOX_ENV
 # is used to install and run tests
-python: 2.7
+python: 3.5
 env:
   - TOX_ENV=py27
   - TOX_ENV=py32
