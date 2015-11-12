@@ -1,0 +1,1102 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>API Documentation &mdash; suitcase 0.6 documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="suitcase 0.6 documentation" href="index.html" />
+    <link rel="prev" title="Examples" href="examples.html" />
+   
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+
+  </head>
+  <body role="document">  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="api-documentation">
+<h1>API Documentation<a class="headerlink" href="#api-documentation" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="module-suitcase.protocol">
+<span id="protocol"></span><h2>Protocol<a class="headerlink" href="#module-suitcase.protocol" title="Permalink to this headline">¶</a></h2>
+<p>Define protocol handlers for different classes of protocols</p>
+<p>These protocols all wrap some base message schema and provide
+all the necessary hooks for pushing in a stream of bytes and
+getting out packets in the order they were found.  The protocol
+handlers will also provide notifications of error conditions
+(for instance, unexpected bytes or a bad checksum).</p>
+<dl class="class">
+<dt id="suitcase.protocol.StreamProtocolHandler">
+<em class="property">class </em><code class="descclassname">suitcase.protocol.</code><code class="descname">StreamProtocolHandler</code><span class="sig-paren">(</span><em>message_schema</em>, <em>packet_callback</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/protocol.html#StreamProtocolHandler"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.protocol.StreamProtocolHandler" title="Permalink to this definition">¶</a></dt>
+<dd><p>Protocol handler that deals fluidly with a stream of bytes</p>
+<p>The protocol handler is agnostic to the data source or methodology
+being used to collect the data  (blocking reads on a socket to async
+IO on a serial port).</p>
+<p>Here&#8217;s an example of what one usage might look like (very simple
+approach for parsing a simple TCP protocol:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">suitcase.protocol</span> <span class="kn">import</span> <span class="n">StreamProtocolHandler</span>
+<span class="kn">from</span> <span class="nn">suitcase.fields</span> <span class="kn">import</span> <span class="n">LengthField</span><span class="p">,</span> <span class="n">UBInt16</span><span class="p">,</span> <span class="n">VariableRawPayload</span>
+<span class="kn">from</span> <span class="nn">suitcase.structure</span> <span class="kn">import</span> <span class="n">Structure</span>
+<span class="kn">import</span> <span class="nn">socket</span>
+
+<span class="k">class</span> <span class="nc">SimpleFramedMessage</span><span class="p">(</span><span class="n">Structure</span><span class="p">):</span>
+    <span class="n">length</span> <span class="o">=</span> <span class="n">LengthField</span><span class="p">(</span><span class="n">UBInt16</span><span class="p">())</span>
+    <span class="n">payload</span> <span class="o">=</span> <span class="n">VariableRawPayload</span><span class="p">(</span><span class="n">length</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">packet_received</span><span class="p">(</span><span class="n">packet</span><span class="p">):</span>
+    <span class="k">print</span><span class="p">(</span><span class="n">packet</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">run_forever</span><span class="p">(</span><span class="n">host</span><span class="p">,</span> <span class="n">port</span><span class="p">):</span>
+    <span class="n">protocol_handler</span> <span class="o">=</span> <span class="n">StreamProtocolHandler</span><span class="p">(</span><span class="n">SimpleFramedMessage</span><span class="p">,</span>
+                                             <span class="n">packet_received</span><span class="p">)</span>
+    <span class="n">sock</span> <span class="o">=</span> <span class="n">socket</span><span class="o">.</span><span class="n">socket</span><span class="p">(</span><span class="n">socket</span><span class="o">.</span><span class="n">AF_INET</span><span class="p">,</span> <span class="n">socket</span><span class="o">.</span><span class="n">SOCK_STREAM</span><span class="p">)</span>
+    <span class="n">sock</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">host</span><span class="p">,</span> <span class="n">port</span><span class="p">)</span>
+    <span class="n">sock</span><span class="o">.</span><span class="n">setblocking</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">while</span> <span class="bp">True</span><span class="p">:</span>
+        <span class="nb">bytes</span> <span class="o">=</span> <span class="n">sock</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="mi">1024</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nb">bytes</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">print</span><span class="p">(</span><span class="s">&quot;Socket closed... exiting&quot;</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">protocol_handler</span><span class="o">.</span><span class="n">feed</span><span class="p">(</span><span class="nb">bytes</span><span class="p">)</span>
+</pre></div>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>message_schema</strong> &#8211; The top-level message schema that defines the
+packets for the protocol to be used.</li>
+<li><strong>packet_callback</strong> &#8211; A callback to be executed with the form
+<code class="docutils literal"><span class="pre">callback(packet)</span></code> when a fully-formed packet is detected.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<dl class="method">
+<dt id="suitcase.protocol.StreamProtocolHandler.feed">
+<code class="descname">feed</code><span class="sig-paren">(</span><em>new_bytes</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/protocol.html#StreamProtocolHandler.feed"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.protocol.StreamProtocolHandler.feed" title="Permalink to this definition">¶</a></dt>
+<dd><p>Feed a new set of bytes into the protocol handler</p>
+<p>These bytes will be immediately fed into the parsing state machine and
+if new packets are found, the <code class="docutils literal"><span class="pre">packet_callback</span></code> will be executed
+with the fully-formed message.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>new_bytes</strong> &#8211; The new bytes to be fed into the stream protocol
+handler.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="suitcase.protocol.StreamProtocolHandler.reset">
+<code class="descname">reset</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/protocol.html#StreamProtocolHandler.reset"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.protocol.StreamProtocolHandler.reset" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reset the internal state machine to a fresh state</p>
+<p>If the protocol in use does not properly handle cases of possible
+de-synchronization it might be necessary to issue a reset if bytes
+are being received but no packets are coming out of the state
+machine.  A reset is issue internally whenever an unexpected exception
+is encountered while processing bytes from the stream.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="module-suitcase.structure">
+<span id="structure"></span><h2>Structure<a class="headerlink" href="#module-suitcase.structure" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="suitcase.structure.Packer">
+<em class="property">class </em><code class="descclassname">suitcase.structure.</code><code class="descname">Packer</code><span class="sig-paren">(</span><em>ordered_fields</em>, <em>crc_field</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/structure.html#Packer"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.structure.Packer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Object responsible for packing/unpacking bytes into/from fields</p>
+<dl class="method">
+<dt id="suitcase.structure.Packer.unpack_stream">
+<code class="descname">unpack_stream</code><span class="sig-paren">(</span><em>stream</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/structure.html#Packer.unpack_stream"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.structure.Packer.unpack_stream" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unpack bytes from a stream of data field-by-field</p>
+<p>In the most basic case, the basic algorithm here is as follows:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">for</span> <span class="n">_name</span><span class="p">,</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ordered_fields</span><span class="p">:</span>
+   <span class="n">length</span> <span class="o">=</span> <span class="n">field</span><span class="o">.</span><span class="n">bytes_required</span>
+   <span class="n">data</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">length</span><span class="p">)</span>
+   <span class="n">field</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This logic is complicated somewhat by the handling of variable length
+greedy fields (there may only be one).  The logic when we see a
+greedy field (bytes_required returns None) in the stream is to
+pivot and parse the remaining fields starting from the last and
+moving through the stream backwards.  There is also some special
+logic present for dealing with checksum fields.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="exception">
+<dt id="suitcase.structure.ParseError">
+<em class="property">exception </em><code class="descclassname">suitcase.structure.</code><code class="descname">ParseError</code><a class="reference internal" href="_modules/suitcase/structure.html#ParseError"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.structure.ParseError" title="Permalink to this definition">¶</a></dt>
+<dd><p>Exception raised when there is an error parsing</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.structure.Structure">
+<em class="property">class </em><code class="descclassname">suitcase.structure.</code><code class="descname">Structure</code><a class="reference internal" href="_modules/suitcase/structure.html#Structure"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.structure.Structure" title="Permalink to this definition">¶</a></dt>
+<dd><p>Base class for message schema declaration</p>
+<p><code class="docutils literal"><span class="pre">Structure</span></code> forms the core of the Suitcase library and allows for
+a declarative syntax for specifying packet schemas and associated
+methods for transforming these schemas into packed bytes (and vice-versa).</p>
+<p>Here&#8217;s an example showing how one might specify the format for a UDP
+Datagram:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">suitcase.fields</span> <span class="kn">import</span> <span class="n">UBInt16</span><span class="p">,</span> <span class="n">LengthField</span><span class="p">,</span> <span class="n">VariableRawPayload</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">class</span> <span class="nc">UDPDatagram</span><span class="p">(</span><span class="n">Structure</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="n">source_port</span> <span class="o">=</span> <span class="n">UBInt16</span><span class="p">()</span>
+<span class="gp">... </span>    <span class="n">destination_port</span> <span class="o">=</span> <span class="n">UBInt16</span><span class="p">()</span>
+<span class="gp">... </span>    <span class="n">length</span> <span class="o">=</span> <span class="n">LengthField</span><span class="p">(</span><span class="n">UBInt16</span><span class="p">())</span>
+<span class="gp">... </span>    <span class="n">checksum</span> <span class="o">=</span> <span class="n">UBInt16</span><span class="p">()</span>
+<span class="gp">... </span>    <span class="n">data</span> <span class="o">=</span> <span class="n">VariableRawPayload</span><span class="p">(</span><span class="n">length</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>From this we have a near-ideal form for packing and parsing packet
+data following the schema:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">printb</span><span class="p">(</span><span class="n">s</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">print</span><span class="p">(</span><span class="nb">repr</span><span class="p">(</span><span class="n">s</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s">&quot;b&#39;&quot;</span><span class="p">,</span> <span class="s">&quot;&#39;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s">&quot;u&#39;&quot;</span><span class="p">,</span> <span class="s">&quot;&#39;&quot;</span><span class="p">))</span>
+<span class="gp">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dgram</span> <span class="o">=</span> <span class="n">UDPDatagram</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dgram</span><span class="o">.</span><span class="n">source_port</span> <span class="o">=</span> <span class="mi">9110</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dgram</span><span class="o">.</span><span class="n">destination_port</span> <span class="o">=</span> <span class="mi">1001</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dgram</span><span class="o">.</span><span class="n">checksum</span> <span class="o">=</span> <span class="mi">27193</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dgram</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;Hello, world!&quot;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">printb</span><span class="p">(</span><span class="n">dgram</span><span class="o">.</span><span class="n">pack</span><span class="p">())</span>
+<span class="go">&#39;#\x96\x03\xe9\x00\rj9Hello, world!&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dgram2</span> <span class="o">=</span> <span class="n">UDPDatagram</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dgram2</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="n">dgram</span><span class="o">.</span><span class="n">pack</span><span class="p">())</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dgram2</span>
+<span class="go">UDPDatagram (</span>
+<span class="go">  source_port=9110,</span>
+<span class="go">  destination_port=1001,</span>
+<span class="go">  length=13,</span>
+<span class="go">  checksum=27193,</span>
+<span class="go">  data=...&#39;Hello, world!&#39;,</span>
+<span class="go">)</span>
+</pre></div>
+</div>
+<dl class="classmethod">
+<dt id="suitcase.structure.Structure.from_data">
+<em class="property">classmethod </em><code class="descname">from_data</code><span class="sig-paren">(</span><em>data</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/structure.html#Structure.from_data"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.structure.Structure.from_data" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create a new, populated message from some data</p>
+<p>This factory method is identical to doing the following, it just takes
+one line instead of two and looks nicer in general:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">m</span> <span class="o">=</span> <span class="n">MyMessage</span><span class="p">()</span>
+<span class="n">m</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Can be rewritten as just:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">m</span> <span class="o">=</span> <span class="n">MyMessage</span><span class="o">.</span><span class="n">from_data</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.structure.StructureMeta">
+<em class="property">class </em><code class="descclassname">suitcase.structure.</code><code class="descname">StructureMeta</code><a class="reference internal" href="_modules/suitcase/structure.html#StructureMeta"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.structure.StructureMeta" title="Permalink to this definition">¶</a></dt>
+<dd><p>Metaclass for all structure objects</p>
+<p>When a class with this metaclass is created, we look for any
+FieldProperty instances associated with the class and record
+those for use later on.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="module-suitcase.fields">
+<span id="fields"></span><h2>Fields<a class="headerlink" href="#module-suitcase.fields" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="suitcase.fields.BaseField">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">BaseField</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#BaseField"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.BaseField" title="Permalink to this definition">¶</a></dt>
+<dd><p>Base class for all Field instances</p>
+<p>Some magic is used whenever a field is created normally in order to
+allow for a declarative syntax without having to create explicit
+factory methods/classes everywhere.  By default (for a normal call)
+when a field is instantiated, it actually ends up returning a
+FieldPlaceholder object containing information about the field
+that has been declared.</p>
+<p>To get an actual instance of the field, the call to the construction
+must include a keyword argument <code class="docutils literal"><span class="pre">instantiate</span></code> that is set to some
+truthy value.  Typically, this instantiation logic is done by
+calling <code class="docutils literal"><span class="pre">FieldPlaceholder.create_instance(parent)</span></code>.  This is the
+recommended way to construct a field as it ensure all invariants
+are in place (having a parent).</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>instantiate</strong> &#8211; Create an actual instance instead of a placeholder</li>
+<li><strong>parent</strong> &#8211; Specify the parent of this field (typically a Structure
+instance).</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.BaseFixedByteSequence">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">BaseFixedByteSequence</code><span class="sig-paren">(</span><em>make_format</em>, <em>size</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#BaseFixedByteSequence"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.BaseFixedByteSequence" title="Permalink to this definition">¶</a></dt>
+<dd><p>Base fixed-length byte sequence field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.BaseStructField">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">BaseStructField</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#BaseStructField"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.BaseStructField" title="Permalink to this definition">¶</a></dt>
+<dd><p>Base for fields based very directly on python struct module formats</p>
+<p>It is expected that this class will be subclassed and customized by
+defining <code class="docutils literal"><span class="pre">FORMAT</span></code> at the class level.  <code class="docutils literal"><span class="pre">FORMAT</span></code> is expected to
+be a format string that could be used with struct.pack/unpack.  It
+should include endianness information.  If the <code class="docutils literal"><span class="pre">FORMAT</span></code> includes
+multiple elements, the default <code class="docutils literal"><span class="pre">_unpack</span></code> logic assumes that each
+element is a single byte and will OR these together.  To specialize
+this, _unpack should be overridden.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.BitField">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">BitField</code><span class="sig-paren">(</span><em>number_bits</em>, <em>field=None</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#BitField"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.BitField" title="Permalink to this definition">¶</a></dt>
+<dd><p>Represent a sequence of bytes broken down into bit segments</p>
+<p>Bit segments may be any BitFieldField instance, with the two most
+commonly used fields being:</p>
+<ul>
+<li><p class="first">BitBool(): A single bit flag that is either True or False</p>
+</li>
+<li><dl class="first docutils">
+<dt>BitNum(bits): A multi-bit field treated like a big-endian integral</dt>
+<dd><p class="first last">value.</p>
+</dd>
+</dl>
+</li>
+</ul>
+<p>Example Usage:</p>
+<div class="highlight-python"><div class="highlight"><pre>class TCPFrameHeader(Structure):
+    source_address = UBInt16()
+    destination_address = UBInt16()
+    sequence_number = UBInt32()
+    acknowledgement_number = UBInt32()
+    options = BitField(16,
+        data_offset=BitNum(4),
+        reserved=BitNum(3),
+        NS=BitBool(),
+        CWR=BitBool(),
+        ECE=BitBool(),
+        URG=BitBool(),
+        ACK=BitBool(),
+        PSH=BitBool(),
+        RST=BitBool(),
+        SYN=BitBool(),
+        FIN=BitBool()
+    )
+    window_size = UBInt16()
+    checksum = UBInt16()
+    urgent_pointer = UBInt16()
+
+tcp_packet = TCPFrameHeader()
+o = tcp_packet.options
+o.data_offset = 3
+o.NS = True
+o.CWR = False
+o.
+# ... so on, so forth
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.CRCField">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">CRCField</code><span class="sig-paren">(</span><em>field</em>, <em>algo</em>, <em>start</em>, <em>end</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#CRCField"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.CRCField" title="Permalink to this definition">¶</a></dt>
+<dd><p>Field representing CRC (Cyclical Redundancy Check) in a message</p>
+<p>CRC checks and calculation frequently work quite differently
+from other fields in a protocol and as such are treated differently
+by the message container.  In particular, a CRCField requires
+special steps at either the beginning or end of the message
+pack/unpack process.  For each CRCField, we specify the following:</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>field</strong> &#8211; The underlying field defining how the checksum will
+be stored.  This should match the size of the checksum in
+whatever algorithm is being used (16 bits for CRC16).</li>
+<li><strong>algo</strong> &#8211; The algorithm to be used for performing the checksum.
+This is basically a function that takes a chunk of data and
+gives the checksum.  Several of these are provided out of the
+box in <code class="docutils literal"><span class="pre">suitcase.crc</span></code>.</li>
+<li><strong>start</strong> &#8211; The offset in the overall message at which we should
+start the checksum.  This may be positive (from the start) or
+negative (from the end of the message).</li>
+<li><strong>end</strong> &#8211; The offset in the overall message at which we should
+end the checksum algo.  This may be positive (from the start)
+or negative (from the end of the message).</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p>A quick example of a message with a checksum is in order:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">MyChecksummedMessage</span><span class="p">(</span><span class="n">Structure</span><span class="p">):</span>
+    <span class="n">soh</span> <span class="o">=</span> <span class="n">Magic</span><span class="p">(</span><span class="s">&#39;</span><span class="se">\x1f\x1f</span><span class="s">&#39;</span><span class="p">)</span>
+    <span class="n">message_id</span> <span class="o">=</span> <span class="n">UBInt16</span><span class="p">()</span>
+    <span class="n">sequence_number</span> <span class="o">=</span> <span class="n">UBInt8</span><span class="p">()</span>
+    <span class="n">payload_length</span> <span class="o">=</span> <span class="n">LengthField</span><span class="p">(</span><span class="n">UBInt16</span><span class="p">())</span>
+    <span class="n">payload</span> <span class="o">=</span> <span class="n">VariableRawPayload</span><span class="p">(</span><span class="n">payload_length</span><span class="p">)</span>
+
+    <span class="c"># crc starts after soh and ends before crc</span>
+    <span class="n">crc</span> <span class="o">=</span> <span class="n">CRCField</span><span class="p">(</span><span class="n">UBInt16</span><span class="p">(),</span> <span class="n">crc16_ccitt</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="o">-</span><span class="mi">3</span><span class="p">)</span>
+    <span class="n">eof</span> <span class="o">=</span> <span class="n">Magic</span><span class="p">(</span><span class="s">&#39;~&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<dl class="method">
+<dt id="suitcase.fields.CRCField.packed_checksum">
+<code class="descname">packed_checksum</code><span class="sig-paren">(</span><em>data</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#CRCField.packed_checksum"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.CRCField.packed_checksum" title="Permalink to this definition">¶</a></dt>
+<dd><p>Given the data of the entire packet return the checksum bytes</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="suitcase.fields.CRCField.validate">
+<code class="descname">validate</code><span class="sig-paren">(</span><em>data</em>, <em>offset</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#CRCField.validate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.CRCField.validate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Raises <code class="xref py py-class docutils literal"><span class="pre">SuitcaseChecksumException</span></code> if not valid</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.ConditionalField">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">ConditionalField</code><span class="sig-paren">(</span><em>field</em>, <em>condition</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#ConditionalField"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.ConditionalField" title="Permalink to this definition">¶</a></dt>
+<dd><p>Field which may or may not be included depending on some condition</p>
+<p>In some protocols, there exist fields which may or may not be present
+depending on the values of other fields that would have already been
+parsed at this point in time.  Wrapping such fields in  a ConditionalField
+allows us to define a function to examine that state and only have the
+field capture the bytes if the conditions are right.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>field</strong> &#8211; The field which should handle the parsing if the condition
+evaluates to true.</li>
+<li><strong>condition</strong> &#8211; This is a function which is given access to the parent
+message that is expected to return a boolean value.  If the value
+is true, then <code class="docutils literal"><span class="pre">field</span></code> will handle the bytes.  If not, then the
+field will be skipped and left with its default value (None).</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.DependentField">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">DependentField</code><span class="sig-paren">(</span><em>name</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#DependentField"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.DependentField" title="Permalink to this definition">¶</a></dt>
+<dd><p>Field populated by container packet at lower level</p>
+<p>It is sometimes the case that information from another layer of a
+messaging protocol be needed at another higher-level of the protocol.
+The DependentField is a way of declaring that a message at some layer
+is dependent on a field with some name from the parent layer.</p>
+<p>For instance, let&#8217;s suppose that my protocol had an option byte that
+I wanted to include in some logic handling packets at some higher
+layer.  I could include that byte in my message as follows:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">MyDependentMessage</span><span class="p">(</span><span class="n">Structure</span><span class="p">):</span>
+    <span class="n">ll_options</span> <span class="o">=</span> <span class="n">DependentField</span><span class="p">(</span><span class="s">&#39;proto_options&#39;</span><span class="p">)</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">UBInt8Sequence</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
+
+<span class="k">class</span> <span class="nc">LowerLevelProtocol</span><span class="p">(</span><span class="n">Structure</span><span class="p">):</span>
+    <span class="nb">type</span> <span class="o">=</span> <span class="n">DispatchField</span><span class="p">(</span><span class="n">UBInt16</span><span class="p">())</span>
+    <span class="n">proto_options</span> <span class="o">=</span> <span class="n">UBInt8</span><span class="p">()</span>
+    <span class="n">body</span> <span class="o">=</span> <span class="n">DispatchTarget</span><span class="p">(</span><span class="bp">None</span><span class="p">,</span> <span class="nb">type</span><span class="p">,</span> <span class="p">{</span>
+        <span class="mh">0x00</span><span class="p">:</span> <span class="n">MyDependentMessage</span><span class="p">,</span>
+    <span class="p">})</span>
+</pre></div>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>name</strong> &#8211; The name of the field from the parent message that we
+would like brought into our message namespace.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.DispatchField">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">DispatchField</code><span class="sig-paren">(</span><em>field</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#DispatchField"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.DispatchField" title="Permalink to this definition">¶</a></dt>
+<dd><p>Decorate a field as a dispatch byte (used as conditional)</p>
+<p>A DispatchField is always used with a DispatchTarget within the same
+message (at some level).</p>
+<p>Example:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">MyMessage</span><span class="p">(</span><span class="n">Structure</span><span class="p">):</span>
+    <span class="nb">type</span> <span class="o">=</span> <span class="n">DispatchField</span><span class="p">(</span><span class="n">UBInt8</span><span class="p">())</span>
+    <span class="n">body</span> <span class="o">=</span> <span class="n">DispatchTarget</span><span class="p">(</span><span class="n">dispatch_field</span><span class="o">=</span><span class="nb">type</span><span class="p">,</span> <span class="n">dispatch_mapping</span><span class="o">=</span><span class="p">{</span>
+        <span class="mh">0x00</span><span class="p">:</span> <span class="n">MessageType0</span><span class="p">,</span>
+        <span class="mh">0x01</span><span class="p">:</span> <span class="n">MessageType1</span><span class="p">,</span>
+    <span class="p">})</span>
+</pre></div>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>field</strong> &#8211; The field containing the dispatch parameter.  This is
+typically an integer but could be any hashable object.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.DispatchTarget">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">DispatchTarget</code><span class="sig-paren">(</span><em>length_provider</em>, <em>dispatch_field</em>, <em>dispatch_mapping</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#DispatchTarget"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.DispatchTarget" title="Permalink to this definition">¶</a></dt>
+<dd><p>Represent a conditional branch on some DispatchField</p>
+<p>Example:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">MyMessage</span><span class="p">(</span><span class="n">Structure</span><span class="p">):</span>
+    <span class="nb">type</span> <span class="o">=</span> <span class="n">DispatchField</span><span class="p">(</span><span class="n">UBInt8</span><span class="p">())</span>
+    <span class="n">body</span> <span class="o">=</span> <span class="n">DispatchTarget</span><span class="p">(</span><span class="n">dispatch_field</span><span class="o">=</span><span class="nb">type</span><span class="p">,</span> <span class="n">dispatch_mapping</span><span class="o">=</span><span class="p">{</span>
+        <span class="mh">0x00</span><span class="p">:</span> <span class="n">MessageType0</span><span class="p">,</span>
+        <span class="mh">0x01</span><span class="p">:</span> <span class="n">MessageType1</span><span class="p">,</span>
+    <span class="p">})</span>
+</pre></div>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>length_provider</strong> &#8211; The field providing a length value binding this
+message (if any).  Set this field to None to leave unconstrained.</li>
+<li><strong>dispatch_field</strong> &#8211; The field being target for dispatch.  In most
+protocols this is an integer type byte or something similar.  The
+possible values for this field act as the keys for the dispatch.</li>
+<li><strong>dispatch_mapping</strong> &#8211; This is a dictionary mapping dispatch_field
+values to associated message types to handle the remaining processing.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.FieldArray">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">FieldArray</code><span class="sig-paren">(</span><em>substructure</em>, <em>length_provider=None</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#FieldArray"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.FieldArray" title="Permalink to this definition">¶</a></dt>
+<dd><p>Field which contains a list of some other field.</p>
+<p>In some protocols, there exist repeated substructures which are present in a
+variable number. The variable nature of these fields make a DispatchField
+and DispatchTarget combination unsuitable; instead a FieldArray may be
+used to pack/unpack these fields to/from a list.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>substructure</strong> &#8211; The type of the array element. Must not be a greedy
+field, or else the array will only ever have one element containing
+the entire contents of the array.</li>
+<li><strong>length_provider</strong> &#8211; The field providing a length value binding this
+message (if any).  Set this field to None to leave unconstrained.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p>For example, one can imagine a message listing the zipcodes covered by
+a telephone area code. Depending on the population density, the number
+of zipcodes per area code could vary greatly. One implementation of this
+data structure could be:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">suitcase.structure</span> <span class="kn">import</span> <span class="n">Structure</span>
+<span class="kn">from</span> <span class="nn">suitcase.fields</span> <span class="kn">import</span> <span class="n">UBInt16</span><span class="p">,</span> <span class="n">FieldArray</span>
+
+<span class="k">class</span> <span class="nc">ZipcodeStructure</span><span class="p">(</span><span class="n">Structure</span><span class="p">):</span>
+    <span class="n">zipcode</span> <span class="o">=</span> <span class="n">UBInt16</span><span class="p">()</span>
+
+<span class="k">class</span> <span class="nc">TelephoneZipcodes</span><span class="p">(</span><span class="n">Structure</span><span class="p">):</span>
+    <span class="n">areacode</span> <span class="o">=</span> <span class="n">UBInt16</span><span class="p">()</span>
+    <span class="n">zipcodes</span> <span class="o">=</span> <span class="n">FieldArray</span><span class="p">(</span><span class="n">ZipcodeStructure</span><span class="p">)</span>  <span class="c"># variable number of zipcodes</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.FieldPlaceholder">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">FieldPlaceholder</code><span class="sig-paren">(</span><em>cls</em>, <em>args</em>, <em>kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#FieldPlaceholder"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.FieldPlaceholder" title="Permalink to this definition">¶</a></dt>
+<dd><p>Internally used object that holds information about a field schema</p>
+<p>A FieldPlaceholder is what is actually instantiated and stored with
+the message schema class when a message schema is declared.  The
+placeholder stores all instantiation information needed to create
+the fields when the message object is instantiated</p>
+<dl class="method">
+<dt id="suitcase.fields.FieldPlaceholder.create_instance">
+<code class="descname">create_instance</code><span class="sig-paren">(</span><em>parent</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#FieldPlaceholder.create_instance"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.FieldPlaceholder.create_instance" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create an instance based off this placeholder with some parent</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.FieldProperty">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">FieldProperty</code><span class="sig-paren">(</span><em>field</em>, <em>onget=None</em>, <em>onset=None</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#FieldProperty"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.FieldProperty" title="Permalink to this definition">¶</a></dt>
+<dd><p>Provide the ability to define &#8220;Property&#8221; getter/setters for other fields</p>
+<p>This is useful and preferable and preferable to inheritance if you want
+to provide a different interface for getting/setting one some field
+within a message.  Take the test case as an example:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="c"># define the message</span>
+<span class="k">class</span> <span class="nc">MyMessage</span><span class="p">(</span><span class="n">Structure</span><span class="p">):</span>
+    <span class="n">_version</span> <span class="o">=</span> <span class="n">UBByteSequence</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">version</span> <span class="o">=</span> <span class="n">FieldProperty</span><span class="p">(</span><span class="n">_version</span><span class="p">,</span>
+                            <span class="n">onget</span><span class="o">=</span><span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="s">&quot;</span><span class="si">%d</span><span class="s">.</span><span class="si">%02d</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">v</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
+                            <span class="n">onset</span><span class="o">=</span><span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span>
+                                                  <span class="ow">in</span> <span class="n">v</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&quot;.&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)))</span>
+
+<span class="n">msg</span> <span class="o">=</span> <span class="n">MyMessage</span><span class="p">()</span>
+<span class="n">msg</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="s">&#39;&#39;</span><span class="p">)</span>
+<span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">_version</span><span class="p">,(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+<span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">version</span><span class="p">,</span> <span class="s">&quot;16.03&quot;</span><span class="p">)</span>
+
+<span class="n">msg</span><span class="o">.</span><span class="n">version</span> <span class="o">=</span> <span class="s">&quot;22.7&quot;</span>
+<span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">_version</span><span class="p">,</span> <span class="p">(</span><span class="mi">22</span><span class="p">,</span> <span class="mi">7</span><span class="p">))</span>
+<span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">version</span><span class="p">,</span> <span class="s">&quot;22.07&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>field</strong> &#8211; The field that is wrapped by this FieldProperty.  The value
+of this field is passed into or set by the associated get/set fns.</li>
+<li><strong>onget</strong> &#8211; This is a function pointer to a function called to mutate
+the value returned on field access.  The function receives a single
+argument containing the value of the wrapped field.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Oaram onset:</th><td class="field-body"><p class="first last">This is a function pointer to a function called to map
+between the property and the underlying field.  The function takes
+a single parameter which is the value the property was set to.  It
+should return the value that the underlying field expects (or raise
+an exception if appropriate).</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.LengthField">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">LengthField</code><span class="sig-paren">(</span><em>length_field</em>, <em>get_length=None</em>, <em>set_length=None</em>, <em>multiplier=1</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#LengthField"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.LengthField" title="Permalink to this definition">¶</a></dt>
+<dd><p>Wraps an existing field marking it as a LengthField</p>
+<p>This field wraps another field which is assumed to return an
+integer value.  A LengthField can be pointed to by a variable
+length field and the two will be coupled appropriately.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>length_field</strong> &#8211; The field providing the actual length value to
+be used.  This field should return an integer value representing
+the length (or a multiple of the length) as a return value</li>
+<li><strong>get_length</strong> &#8211; If specified, this is a function which takes a reference
+to the encapsulated field and is responsible for reading the length
+out from that field.  By default, this just reads the value of the
+field (field is expected to be an integral value).</li>
+<li><strong>set_length</strong> &#8211; If specified, this is a function which takes a reference
+to the encapsulated field and a length value.  Its responsibility
+is to move the provided length value into the field.  By default,
+the length value is just assigned to the field via <cite>setval()</cite>.</li>
+<li><strong>multiplier</strong> &#8211; If specified, this multiplier is applied to the
+length.  If I specify a multiplier of 8, I am saying that each bit
+in the length field represents 8 bytes of actual payload length. By
+default the multiplier is 1 (1 bit/byte).</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.Magic">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">Magic</code><span class="sig-paren">(</span><em>expected_sequence</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#Magic"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.Magic" title="Permalink to this definition">¶</a></dt>
+<dd><p>Represent Byte Magic (fixed, expected sequence of bytes)</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.Payload">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">Payload</code><span class="sig-paren">(</span><em>length_provider=None</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#Payload"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.Payload" title="Permalink to this definition">¶</a></dt>
+<dd><p>Variable length raw (byte string) field</p>
+<p>This field is expected to be used with a LengthField.  The variable
+length field provides a value to be used by the LengthField on
+message pack and vice-versa for unpack.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>length_provider</strong> &#8211; The LengthField with which this variable
+length payload is associated.  If not included, it is assumed that
+the length_provider should consume the remainder of the bytes
+available in the string.  This is only valid in cases where the
+developer knows that they will be dealing with a fixed sequence
+of bytes (already boxed).</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.SBInt16">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">SBInt16</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#SBInt16"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.SBInt16" title="Permalink to this definition">¶</a></dt>
+<dd><p>Signed Big Endian 16-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.SBInt24">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">SBInt24</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#SBInt24"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.SBInt24" title="Permalink to this definition">¶</a></dt>
+<dd><p>Signed Big Endian 24-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.SBInt32">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">SBInt32</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#SBInt32"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.SBInt32" title="Permalink to this definition">¶</a></dt>
+<dd><p>Signed Big Endian 32-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.SBInt40">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">SBInt40</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#SBInt40"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.SBInt40" title="Permalink to this definition">¶</a></dt>
+<dd><p>Signed Big Endian 40-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.SBInt48">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">SBInt48</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#SBInt48"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.SBInt48" title="Permalink to this definition">¶</a></dt>
+<dd><p>Signed Big Endian 48-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.SBInt56">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">SBInt56</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#SBInt56"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.SBInt56" title="Permalink to this definition">¶</a></dt>
+<dd><p>Signed Big Endian 56-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.SBInt64">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">SBInt64</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#SBInt64"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.SBInt64" title="Permalink to this definition">¶</a></dt>
+<dd><p>Signed Big Endian 64-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.SBInt8">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">SBInt8</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#SBInt8"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.SBInt8" title="Permalink to this definition">¶</a></dt>
+<dd><p>Signed Big Endian 8-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.SLInt16">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">SLInt16</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#SLInt16"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.SLInt16" title="Permalink to this definition">¶</a></dt>
+<dd><p>Signed Little Endian 16-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.SLInt24">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">SLInt24</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#SLInt24"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.SLInt24" title="Permalink to this definition">¶</a></dt>
+<dd><p>Signed Little Endian 24-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.SLInt32">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">SLInt32</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#SLInt32"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.SLInt32" title="Permalink to this definition">¶</a></dt>
+<dd><p>Signed Little Endian 32-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.SLInt40">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">SLInt40</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#SLInt40"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.SLInt40" title="Permalink to this definition">¶</a></dt>
+<dd><p>Signed Little Endian 40-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.SLInt48">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">SLInt48</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#SLInt48"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.SLInt48" title="Permalink to this definition">¶</a></dt>
+<dd><p>Signed Little Endian 48-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.SLInt56">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">SLInt56</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#SLInt56"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.SLInt56" title="Permalink to this definition">¶</a></dt>
+<dd><p>Signed Little Endian 56-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.SLInt64">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">SLInt64</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#SLInt64"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.SLInt64" title="Permalink to this definition">¶</a></dt>
+<dd><p>Signed Little Endian 64-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.SLInt8">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">SLInt8</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#SLInt8"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.SLInt8" title="Permalink to this definition">¶</a></dt>
+<dd><p>Signed Little Endian 8-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.SubstructureField">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">SubstructureField</code><span class="sig-paren">(</span><em>substructure</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#SubstructureField"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.SubstructureField" title="Permalink to this definition">¶</a></dt>
+<dd><p>Field which contains another non-greedy Structure.</p>
+<p>Often data-types are needed which cannot be easily
+described by a single field, but are representable as
+Structures. For example, Pascal style strings are prefixed
+with their length. It is often desirable to embed these
+data-types within another Structure, to avoid reimplementing
+them in every usage.</p>
+<p>A Pascal style string could be described as follows:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">suitcase.structure</span> <span class="kn">import</span> <span class="n">Structure</span>
+<span class="kn">from</span> <span class="nn">suitcase.fields</span> <span class="kn">import</span> <span class="n">Payload</span><span class="p">,</span> <span class="n">UBInt16</span><span class="p">,</span> <span class="n">LengthField</span><span class="p">,</span> <span class="n">SubstructureField</span>
+
+<span class="k">class</span> <span class="nc">PascalString16</span><span class="p">(</span><span class="n">Structure</span><span class="p">):</span>
+    <span class="n">length</span> <span class="o">=</span> <span class="n">LengthField</span><span class="p">(</span><span class="n">UBInt16</span><span class="p">())</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">Payload</span><span class="p">(</span><span class="n">length</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>A structure describing a name of a person might consist of two
+Pascal style strings. Instead of describing the ugly way:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">NameUgly</span><span class="p">(</span><span class="n">Structure</span><span class="p">):</span>
+    <span class="n">first_length</span> <span class="o">=</span> <span class="n">LengthField</span><span class="p">(</span><span class="n">UBInt16</span><span class="p">())</span>
+    <span class="n">first_value</span> <span class="o">=</span> <span class="n">Payload</span><span class="p">(</span><span class="n">first_length</span><span class="p">)</span>
+    <span class="n">last_length</span> <span class="o">=</span> <span class="n">LengthField</span><span class="p">(</span><span class="n">UBInt16</span><span class="p">())</span>
+    <span class="n">last_value</span> <span class="o">=</span> <span class="n">Payload</span><span class="p">(</span><span class="n">last_length</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>it could be defined using a SubstructureField:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">Name</span><span class="p">(</span><span class="n">Structure</span><span class="p">):</span>
+    <span class="n">first</span> <span class="o">=</span> <span class="n">SubstructureField</span><span class="p">(</span><span class="n">PascalString16</span><span class="p">)</span>
+    <span class="n">last</span> <span class="o">=</span> <span class="n">SubstructureField</span><span class="p">(</span><span class="n">PascalString16</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.TypeField">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">TypeField</code><span class="sig-paren">(</span><em>type_field</em>, <em>length_mapping</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#TypeField"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.TypeField" title="Permalink to this definition">¶</a></dt>
+<dd><p>Wraps an existing field marking it as a TypeField</p>
+<p>This field wraps another field which is assumed to return an
+integer value.  A TypeField can be pointed to by a variable
+length field and will fix that field&#8217;s length.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>type_field</strong> &#8211; The field providing the type id that will
+be used to lookup a length value</li>
+<li><strong>length_mapping</strong> &#8211; This is a dictionary mapping type_field
+values to associated length values.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p>For example, a TypeField could be used as a replacement for a
+DispatchField so that the associated DispatchTarget is non-greedy,
+without the existence of a seperate LengthField. This enables
+a greedy field to follow the dispatch field, without the usage of
+complex ConditionalField setups:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">Structure8Bit</span><span class="p">(</span><span class="n">Structure</span><span class="p">):</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">UBInt8</span><span class="p">()</span>
+
+<span class="k">class</span> <span class="nc">Structure16Bit</span><span class="p">(</span><span class="n">Structure</span><span class="p">):</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">UBInt16</span><span class="p">()</span>
+
+<span class="k">class</span> <span class="nc">DispatchStructure</span><span class="p">(</span><span class="n">Structure</span><span class="p">):</span>
+    <span class="nb">type</span> <span class="o">=</span> <span class="n">TypeField</span><span class="p">(</span><span class="n">UBInt8</span><span class="p">(),</span> <span class="p">{</span><span class="mh">0x40</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+                                <span class="mh">0x80</span><span class="p">:</span> <span class="mi">2</span><span class="p">})</span>
+    <span class="c"># Here the TypeField is providing both a size and type id</span>
+    <span class="n">dispatch</span> <span class="o">=</span> <span class="n">DispatchTarget</span><span class="p">(</span><span class="nb">type</span><span class="p">,</span> <span class="nb">type</span><span class="p">,</span> <span class="p">{</span><span class="mh">0x40</span><span class="p">:</span> <span class="n">Structure8Bit</span><span class="p">,</span>
+                                           <span class="mh">0x80</span><span class="p">:</span> <span class="n">Structure16Bit</span><span class="p">})</span>
+    <span class="n">greedy</span> <span class="o">=</span> <span class="n">Payload</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.UBInt16">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">UBInt16</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#UBInt16"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.UBInt16" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unsigned Big Endian 16-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.UBInt24">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">UBInt24</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#UBInt24"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.UBInt24" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unsigned Big Endian 24-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.UBInt32">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">UBInt32</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#UBInt32"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.UBInt32" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unsigned Big Endian 32-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.UBInt40">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">UBInt40</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#UBInt40"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.UBInt40" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unsigned Big Endian 40-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.UBInt48">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">UBInt48</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#UBInt48"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.UBInt48" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unsigned Big Endian 48-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.UBInt56">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">UBInt56</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#UBInt56"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.UBInt56" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unsigned Big Endian 56-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.UBInt64">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">UBInt64</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#UBInt64"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.UBInt64" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unsigned Big Endian 64-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.UBInt8">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">UBInt8</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#UBInt8"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.UBInt8" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unsigned Big Endian 8-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.ULInt16">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">ULInt16</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#ULInt16"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.ULInt16" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unsigned Little Endian 16-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.ULInt24">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">ULInt24</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#ULInt24"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.ULInt24" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unsigned Little Endian 24-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.ULInt32">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">ULInt32</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#ULInt32"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.ULInt32" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unsigned Little Endian 32-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.ULInt40">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">ULInt40</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#ULInt40"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.ULInt40" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unsigned Little Endian 40-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.ULInt48">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">ULInt48</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#ULInt48"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.ULInt48" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unsigned Little Endian 48-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.ULInt56">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">ULInt56</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#ULInt56"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.ULInt56" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unsigned Little Endian 56-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.ULInt64">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">ULInt64</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#ULInt64"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.ULInt64" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unsigned Little Endian 64-bit integer field</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="suitcase.fields.ULInt8">
+<em class="property">class </em><code class="descclassname">suitcase.fields.</code><code class="descname">ULInt8</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/fields.html#ULInt8"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.fields.ULInt8" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unsigned Little Endian 8-bit integer field</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="suitcase.fields.VariableRawPayload">
+<code class="descclassname">suitcase.fields.</code><code class="descname">VariableRawPayload</code><a class="headerlink" href="#suitcase.fields.VariableRawPayload" title="Permalink to this definition">¶</a></dt>
+<dd><p>alias of <a class="reference internal" href="#suitcase.fields.Payload" title="suitcase.fields.Payload"><code class="xref py py-class docutils literal"><span class="pre">Payload</span></code></a></p>
+</dd></dl>
+
+</div>
+<div class="section" id="module-suitcase.crc">
+<span id="crc-checksums"></span><h2>CRC Checksums<a class="headerlink" href="#module-suitcase.crc" title="Permalink to this headline">¶</a></h2>
+<p>A collection of Suitcase CRCField compatible CRC algorithms</p>
+<dl class="function">
+<dt id="suitcase.crc.crc16_ccitt">
+<code class="descclassname">suitcase.crc.</code><code class="descname">crc16_ccitt</code><span class="sig-paren">(</span><em>data</em>, <em>crc=0</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/crc.html#crc16_ccitt"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.crc.crc16_ccitt" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate the crc16 ccitt checksum of some data</p>
+<p>A starting crc value may be specified if desired.  The input data
+is expected to be a sequence of bytes (string) and the output
+is an integer in the range (0, 0xFFFF).  No packing is done to the
+resultant crc value.  To check the value a checksum, just pass in
+the data byes and checksum value.  If the data matches the checksum,
+then the resultant checksum from this function should be 0.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="suitcase.crc.crc16_kermit">
+<code class="descclassname">suitcase.crc.</code><code class="descname">crc16_kermit</code><span class="sig-paren">(</span><em>data</em>, <em>crc=0</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/crc.html#crc16_kermit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.crc.crc16_kermit" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate/Update the Kermit CRC16 checksum for some data</p>
+</dd></dl>
+
+</div>
+<div class="section" id="module-suitcase.exceptions">
+<span id="exceptions"></span><h2>Exceptions<a class="headerlink" href="#module-suitcase.exceptions" title="Permalink to this headline">¶</a></h2>
+<p>Define an exception hierarchy used within Suitcase</p>
+<p>The basic rule is that users of the Suitcase library should always
+be able to catch the base <a class="reference internal" href="#suitcase.exceptions.SuitcaseException" title="suitcase.exceptions.SuitcaseException"><code class="xref py py-class docutils literal"><span class="pre">SuitcaseException</span></code></a> and be confident
+that they will not get some other random exception.  Catching
+more specific subclasses of this exception should then be possible.</p>
+<p>There are still some cases (especially when constructing a field) that
+base exceptions (like TypeError, ValueError, or TypeError) might still be
+raised.  In general, however, any case where things are dynamic, we do
+our best to raise a <a class="reference internal" href="#suitcase.exceptions.SuitcaseException" title="suitcase.exceptions.SuitcaseException"><code class="xref py py-class docutils literal"><span class="pre">SuitcaseException</span></code></a> with meaningful information.</p>
+<dl class="exception">
+<dt id="suitcase.exceptions.SuitcaseChecksumException">
+<em class="property">exception </em><code class="descclassname">suitcase.exceptions.</code><code class="descname">SuitcaseChecksumException</code><a class="reference internal" href="_modules/suitcase/exceptions.html#SuitcaseChecksumException"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.exceptions.SuitcaseChecksumException" title="Permalink to this definition">¶</a></dt>
+<dd><p>Exception raised when a checksum does not match</p>
+</dd></dl>
+
+<dl class="exception">
+<dt id="suitcase.exceptions.SuitcaseException">
+<em class="property">exception </em><code class="descclassname">suitcase.exceptions.</code><code class="descname">SuitcaseException</code><a class="reference internal" href="_modules/suitcase/exceptions.html#SuitcaseException"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.exceptions.SuitcaseException" title="Permalink to this definition">¶</a></dt>
+<dd><p>Base exception acting as the root for other exceptions</p>
+</dd></dl>
+
+<dl class="exception">
+<dt id="suitcase.exceptions.SuitcasePackException">
+<em class="property">exception </em><code class="descclassname">suitcase.exceptions.</code><code class="descname">SuitcasePackException</code><a class="reference internal" href="_modules/suitcase/exceptions.html#SuitcasePackException"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.exceptions.SuitcasePackException" title="Permalink to this definition">¶</a></dt>
+<dd><p>Raised when there is an error packing a message</p>
+</dd></dl>
+
+<dl class="exception">
+<dt id="suitcase.exceptions.SuitcasePackStructException">
+<em class="property">exception </em><code class="descclassname">suitcase.exceptions.</code><code class="descname">SuitcasePackStructException</code><span class="sig-paren">(</span><em>struct_exception</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/suitcase/exceptions.html#SuitcasePackStructException"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.exceptions.SuitcasePackStructException" title="Permalink to this definition">¶</a></dt>
+<dd><p>Raised on an error packing a struct field</p>
+</dd></dl>
+
+<dl class="exception">
+<dt id="suitcase.exceptions.SuitcaseParseError">
+<em class="property">exception </em><code class="descclassname">suitcase.exceptions.</code><code class="descname">SuitcaseParseError</code><a class="reference internal" href="_modules/suitcase/exceptions.html#SuitcaseParseError"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.exceptions.SuitcaseParseError" title="Permalink to this definition">¶</a></dt>
+<dd><p>Raised when there is a problem parsing bytes into a suitcase schema</p>
+</dd></dl>
+
+<dl class="exception">
+<dt id="suitcase.exceptions.SuitcaseProgrammingError">
+<em class="property">exception </em><code class="descclassname">suitcase.exceptions.</code><code class="descname">SuitcaseProgrammingError</code><a class="reference internal" href="_modules/suitcase/exceptions.html#SuitcaseProgrammingError"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#suitcase.exceptions.SuitcaseProgrammingError" title="Permalink to this definition">¶</a></dt>
+<dd><p>Exception raised when somebody is doing something wrong</p>
+</dd></dl>
+
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">suitcase</a></h1>
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="getting_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="">API Documentation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#module-suitcase.protocol">Protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-suitcase.structure">Structure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-suitcase.fields">Fields</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-suitcase.crc">CRC Checksums</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-suitcase.exceptions">Exceptions</a></li>
+</ul>
+</li>
+</ul>
+
+
+<hr />
+<ul>
+    
+    <li class="toctree-l1"><a href="http://www.digi.com/wireless-design-services/">Digi WDS</a></li>
+    
+    <li class="toctree-l1"><a href="https://github.com/digidotcom/python-suitcase">Suitcase on Github</a></li>
+    
+</ul>
+
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2015, Digi International, Inc..
+      
+      |
+      <a href="_sources/api.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+    <a href="https://github.com/digidotcom/python-suitcase" class="github">
+        <img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub"  class="github"/>
+    </a>
+    
+
+    
+  </body>
+</html>

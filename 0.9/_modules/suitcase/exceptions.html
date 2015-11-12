@@ -1,0 +1,153 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>suitcase.exceptions &mdash; suitcase 0.6 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="suitcase 0.6 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" />
+   
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+
+  </head>
+  <body role="document">  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for suitcase.exceptions</h1><div class="highlight"><pre>
+<span class="c"># This Source Code Form is subject to the terms of the Mozilla Public</span>
+<span class="c"># License, v. 2.0. If a copy of the MPL was not distributed with this</span>
+<span class="c"># file, You can obtain one at http://mozilla.org/MPL/2.0/.</span>
+<span class="c">#</span>
+<span class="c"># Copyright (c) 2015 Digi International Inc. All Rights Reserved.</span>
+
+<span class="sd">&quot;&quot;&quot;Define an exception hierarchy used within Suitcase</span>
+
+<span class="sd">The basic rule is that users of the Suitcase library should always</span>
+<span class="sd">be able to catch the base :class:`.SuitcaseException` and be confident</span>
+<span class="sd">that they will not get some other random exception.  Catching</span>
+<span class="sd">more specific subclasses of this exception should then be possible.</span>
+
+<span class="sd">There are still some cases (especially when constructing a field) that</span>
+<span class="sd">base exceptions (like TypeError, ValueError, or TypeError) might still be</span>
+<span class="sd">raised.  In general, however, any case where things are dynamic, we do</span>
+<span class="sd">our best to raise a :class:`.SuitcaseException` with meaningful information.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+
+<div class="viewcode-block" id="SuitcaseException"><a class="viewcode-back" href="../../api.html#suitcase.exceptions.SuitcaseException">[docs]</a><span class="k">class</span> <span class="nc">SuitcaseException</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Base exception acting as the root for other exceptions&quot;&quot;&quot;</span>
+
+</div>
+<div class="viewcode-block" id="SuitcaseChecksumException"><a class="viewcode-back" href="../../api.html#suitcase.exceptions.SuitcaseChecksumException">[docs]</a><span class="k">class</span> <span class="nc">SuitcaseChecksumException</span><span class="p">(</span><span class="n">SuitcaseException</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Exception raised when a checksum does not match&quot;&quot;&quot;</span>
+
+</div>
+<div class="viewcode-block" id="SuitcaseProgrammingError"><a class="viewcode-back" href="../../api.html#suitcase.exceptions.SuitcaseProgrammingError">[docs]</a><span class="k">class</span> <span class="nc">SuitcaseProgrammingError</span><span class="p">(</span><span class="n">SuitcaseException</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Exception raised when somebody is doing something wrong&quot;&quot;&quot;</span>
+
+</div>
+<div class="viewcode-block" id="SuitcaseParseError"><a class="viewcode-back" href="../../api.html#suitcase.exceptions.SuitcaseParseError">[docs]</a><span class="k">class</span> <span class="nc">SuitcaseParseError</span><span class="p">(</span><span class="n">SuitcaseException</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Raised when there is a problem parsing bytes into a suitcase schema&quot;&quot;&quot;</span>
+
+</div>
+<div class="viewcode-block" id="SuitcasePackException"><a class="viewcode-back" href="../../api.html#suitcase.exceptions.SuitcasePackException">[docs]</a><span class="k">class</span> <span class="nc">SuitcasePackException</span><span class="p">(</span><span class="n">SuitcaseException</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Raised when there is an error packing a message&quot;&quot;&quot;</span>
+
+</div>
+<div class="viewcode-block" id="SuitcasePackStructException"><a class="viewcode-back" href="../../api.html#suitcase.exceptions.SuitcasePackStructException">[docs]</a><span class="k">class</span> <span class="nc">SuitcasePackStructException</span><span class="p">(</span><span class="n">SuitcasePackException</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Raised on an error packing a struct field&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">struct_exception</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">struct_exception</span> <span class="o">=</span> <span class="n">struct_exception</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">repr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">struct_exception</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">struct_exception</span><span class="p">)</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">suitcase</a></h1>
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+</ul>
+
+
+<hr />
+<ul>
+    
+    <li class="toctree-l1"><a href="http://www.digi.com/wireless-design-services/">Digi WDS</a></li>
+    
+    <li class="toctree-l1"><a href="https://github.com/digidotcom/python-suitcase">Suitcase on Github</a></li>
+    
+</ul>
+
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2015, Digi International, Inc..
+      
+    </div>
+
+    
+    <a href="https://github.com/digidotcom/python-suitcase" class="github">
+        <img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub"  class="github"/>
+    </a>
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,1476 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>suitcase.fields &mdash; suitcase 0.6 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="suitcase 0.6 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" />
+   
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+
+  </head>
+  <body role="document">  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for suitcase.fields</h1><div class="highlight"><pre>
+<span class="c"># This Source Code Form is subject to the terms of the Mozilla Public</span>
+<span class="c"># License, v. 2.0. If a copy of the MPL was not distributed with this</span>
+<span class="c"># file, You can obtain one at http://mozilla.org/MPL/2.0/.</span>
+<span class="c">#</span>
+<span class="c"># Copyright (c) 2015 Digi International Inc. All Rights Reserved.</span>
+<span class="kn">import</span> <span class="nn">struct</span>
+
+<span class="kn">import</span> <span class="nn">six</span>
+<span class="kn">from</span> <span class="nn">suitcase.exceptions</span> <span class="kn">import</span> <span class="n">SuitcaseChecksumException</span><span class="p">,</span> <span class="n">SuitcaseProgrammingError</span><span class="p">,</span> \
+    <span class="n">SuitcaseParseError</span><span class="p">,</span> <span class="n">SuitcaseException</span><span class="p">,</span> <span class="n">SuitcasePackStructException</span>
+<span class="kn">from</span> <span class="nn">six</span> <span class="kn">import</span> <span class="n">BytesIO</span><span class="p">,</span> <span class="n">StringIO</span>
+
+
+<div class="viewcode-block" id="FieldPlaceholder"><a class="viewcode-back" href="../../api.html#suitcase.fields.FieldPlaceholder">[docs]</a><span class="k">class</span> <span class="nc">FieldPlaceholder</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Internally used object that holds information about a field schema</span>
+
+<span class="sd">    A FieldPlaceholder is what is actually instantiated and stored with</span>
+<span class="sd">    the message schema class when a message schema is declared.  The</span>
+<span class="sd">    placeholder stores all instantiation information needed to create</span>
+<span class="sd">    the fields when the message object is instantiated</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c"># record the number of instantiations of fields.  This is how</span>
+    <span class="c"># we can track the order of fields within a message</span>
+    <span class="n">_global_seqno</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cls</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_field_seqno</span> <span class="o">=</span> <span class="n">FieldPlaceholder</span><span class="o">.</span><span class="n">_global_seqno</span>
+        <span class="n">FieldPlaceholder</span><span class="o">.</span><span class="n">_global_seqno</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cls</span> <span class="o">=</span> <span class="n">cls</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">args</span> <span class="o">=</span> <span class="n">args</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kwargs</span> <span class="o">=</span> <span class="n">kwargs</span>
+
+<div class="viewcode-block" id="FieldPlaceholder.create_instance"><a class="viewcode-back" href="../../api.html#suitcase.fields.FieldPlaceholder.create_instance">[docs]</a>    <span class="k">def</span> <span class="nf">create_instance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parent</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Create an instance based off this placeholder with some parent&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kwargs</span><span class="p">[</span><span class="s">&#39;instantiate&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kwargs</span><span class="p">[</span><span class="s">&#39;parent&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parent</span>
+        <span class="n">instance</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cls</span><span class="p">(</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">instance</span><span class="o">.</span><span class="n">_field_seqno</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_field_seqno</span>
+        <span class="k">return</span> <span class="n">instance</span>
+
+</div></div>
+<div class="viewcode-block" id="BaseField"><a class="viewcode-back" href="../../api.html#suitcase.fields.BaseField">[docs]</a><span class="k">class</span> <span class="nc">BaseField</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Base class for all Field instances</span>
+
+<span class="sd">    Some magic is used whenever a field is created normally in order to</span>
+<span class="sd">    allow for a declarative syntax without having to create explicit</span>
+<span class="sd">    factory methods/classes everywhere.  By default (for a normal call)</span>
+<span class="sd">    when a field is instantiated, it actually ends up returning a</span>
+<span class="sd">    FieldPlaceholder object containing information about the field</span>
+<span class="sd">    that has been declared.</span>
+
+<span class="sd">    To get an actual instance of the field, the call to the construction</span>
+<span class="sd">    must include a keyword argument ``instantiate`` that is set to some</span>
+<span class="sd">    truthy value.  Typically, this instantiation logic is done by</span>
+<span class="sd">    calling ``FieldPlaceholder.create_instance(parent)``.  This is the</span>
+<span class="sd">    recommended way to construct a field as it ensure all invariants</span>
+<span class="sd">    are in place (having a parent).</span>
+
+<span class="sd">    :param instantiate: Create an actual instance instead of a placeholder</span>
+<span class="sd">    :param parent: Specify the parent of this field (typically a Structure</span>
+<span class="sd">        instance).</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__new__</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">instantiate</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s">&#39;instantiate&#39;</span><span class="p">,</span> <span class="bp">False</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">instantiate</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">super</span><span class="p">(</span><span class="n">BaseField</span><span class="p">,</span> <span class="n">cls</span><span class="p">)</span><span class="o">.</span><span class="n">__new__</span><span class="p">(</span><span class="n">cls</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">FieldPlaceholder</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_value</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_parent</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;parent&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_ph2f</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">placeholder</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Lookup a field given a field placeholder&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="o">.</span><span class="n">lookup_field_by_placeholder</span><span class="p">(</span><span class="n">placeholder</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">repr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">getval</span><span class="p">())</span>
+
+    <span class="k">def</span> <span class="nf">getval</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_value</span>
+
+    <span class="k">def</span> <span class="nf">setval</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_value</span> <span class="o">=</span> <span class="n">value</span>
+
+</div>
+<div class="viewcode-block" id="CRCField"><a class="viewcode-back" href="../../api.html#suitcase.fields.CRCField">[docs]</a><span class="k">class</span> <span class="nc">CRCField</span><span class="p">(</span><span class="n">BaseField</span><span class="p">):</span>
+    <span class="sd">r&quot;&quot;&quot;Field representing CRC (Cyclical Redundancy Check) in a message</span>
+
+<span class="sd">    CRC checks and calculation frequently work quite differently</span>
+<span class="sd">    from other fields in a protocol and as such are treated differently</span>
+<span class="sd">    by the message container.  In particular, a CRCField requires</span>
+<span class="sd">    special steps at either the beginning or end of the message</span>
+<span class="sd">    pack/unpack process.  For each CRCField, we specify the following:</span>
+
+<span class="sd">    :param field: The underlying field defining how the checksum will</span>
+<span class="sd">        be stored.  This should match the size of the checksum in</span>
+<span class="sd">        whatever algorithm is being used (16 bits for CRC16).</span>
+<span class="sd">    :param algo: The algorithm to be used for performing the checksum.</span>
+<span class="sd">       This is basically a function that takes a chunk of data and</span>
+<span class="sd">       gives the checksum.  Several of these are provided out of the</span>
+<span class="sd">       box in ``suitcase.crc``.</span>
+<span class="sd">    :param start: The offset in the overall message at which we should</span>
+<span class="sd">        start the checksum.  This may be positive (from the start) or</span>
+<span class="sd">        negative (from the end of the message).</span>
+<span class="sd">    :param end: The offset in the overall message at which we should</span>
+<span class="sd">        end the checksum algo.  This may be positive (from the start)</span>
+<span class="sd">        or negative (from the end of the message).</span>
+
+<span class="sd">    A quick example of a message with a checksum is in order::</span>
+
+<span class="sd">        class MyChecksummedMessage(Structure):</span>
+<span class="sd">            soh = Magic(&#39;\x1f\x1f&#39;)</span>
+<span class="sd">            message_id = UBInt16()</span>
+<span class="sd">            sequence_number = UBInt8()</span>
+<span class="sd">            payload_length = LengthField(UBInt16())</span>
+<span class="sd">            payload = VariableRawPayload(payload_length)</span>
+
+<span class="sd">            # crc starts after soh and ends before crc</span>
+<span class="sd">            crc = CRCField(UBInt16(), crc16_ccitt, 2, -3)</span>
+<span class="sd">            eof = Magic(&#39;~&#39;)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">algo</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">BaseField</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">field</span> <span class="o">=</span> <span class="n">field</span><span class="o">.</span><span class="n">create_instance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">field</span><span class="o">.</span><span class="n">setval</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">algo</span> <span class="o">=</span> <span class="n">algo</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">start</span> <span class="o">=</span> <span class="n">start</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">end</span> <span class="o">=</span> <span class="n">end</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_value</span> <span class="o">=</span> <span class="bp">None</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">bytes_required</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">field</span><span class="o">.</span><span class="n">bytes_required</span>
+
+<div class="viewcode-block" id="CRCField.validate"><a class="viewcode-back" href="../../api.html#suitcase.fields.CRCField.validate">[docs]</a>    <span class="k">def</span> <span class="nf">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">offset</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Raises :class:`SuitcaseChecksumException` if not valid&quot;&quot;&quot;</span>
+        <span class="n">recorded_checksum</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">field</span><span class="o">.</span><span class="n">getval</span><span class="p">()</span>
+
+        <span class="c"># convert negative offset to positive</span>
+        <span class="k">if</span> <span class="n">offset</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">offset</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+        <span class="c"># replace checksum region with zero</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">b</span><span class="s">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">((</span><span class="n">data</span><span class="p">[:</span><span class="n">offset</span><span class="p">],</span>
+                         <span class="n">b</span><span class="s">&quot;</span><span class="se">\x00</span><span class="s">&quot;</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">bytes_required</span><span class="p">,</span>
+                         <span class="n">data</span><span class="p">[</span><span class="n">offset</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">bytes_required</span><span class="p">:]))</span>
+        <span class="n">actual_checksum</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">algo</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">start</span><span class="p">:</span><span class="bp">self</span><span class="o">.</span><span class="n">end</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">recorded_checksum</span> <span class="o">!=</span> <span class="n">actual_checksum</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">SuitcaseChecksumException</span><span class="p">(</span>
+                <span class="s">&quot;recorded checksum </span><span class="si">%r</span><span class="s"> did not match actual </span><span class="si">%r</span><span class="s">.  full data: </span><span class="si">%r</span><span class="s">&quot;</span><span class="p">,</span>
+                <span class="n">recorded_checksum</span><span class="p">,</span> <span class="n">actual_checksum</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="CRCField.packed_checksum"><a class="viewcode-back" href="../../api.html#suitcase.fields.CRCField.packed_checksum">[docs]</a>    <span class="k">def</span> <span class="nf">packed_checksum</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Given the data of the entire packet return the checksum bytes&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">field</span><span class="o">.</span><span class="n">setval</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">algo</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">start</span><span class="p">:</span><span class="bp">self</span><span class="o">.</span><span class="n">end</span><span class="p">]))</span>
+        <span class="n">sio</span> <span class="o">=</span> <span class="n">BytesIO</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">field</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="n">sio</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">sio</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
+</div>
+    <span class="k">def</span> <span class="nf">getval</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">field</span><span class="o">.</span><span class="n">getval</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">setval</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">SuitcaseProgrammingError</span><span class="p">(</span><span class="s">&quot;CRC will be set automatically&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">pack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">):</span>
+        <span class="c"># write placeholder during the first pass</span>
+        <span class="n">stream</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">b</span><span class="s">&#39;</span><span class="se">\x00</span><span class="s">&#39;</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">field</span><span class="o">.</span><span class="n">bytes_required</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">unpack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">field</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+</div>
+<div class="viewcode-block" id="Magic"><a class="viewcode-back" href="../../api.html#suitcase.fields.Magic">[docs]</a><span class="k">class</span> <span class="nc">Magic</span><span class="p">(</span><span class="n">BaseField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Represent Byte Magic (fixed, expected sequence of bytes)&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">expected_sequence</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">BaseField</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">expected_sequence</span> <span class="o">=</span> <span class="n">expected_sequence</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bytes_required</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">expected_sequence</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">getval</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">expected_sequence</span>
+
+    <span class="k">def</span> <span class="nf">setval</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">SuitcaseProgrammingError</span><span class="p">(</span><span class="s">&quot;One does not simply modify Magic&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">pack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">):</span>
+        <span class="n">stream</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">expected_sequence</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">unpack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">expected_sequence</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">SuitcaseParseError</span><span class="p">(</span>
+                <span class="s">&quot;Expected sequence </span><span class="si">%r</span><span class="s"> for magic field but got </span><span class="si">%r</span><span class="s"> on &quot;</span>
+                <span class="s">&quot;message </span><span class="si">%r</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">expected_sequence</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s">&quot;Magic(</span><span class="si">%r</span><span class="s">)&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">expected_sequence</span><span class="p">,)</span>
+
+</div>
+<div class="viewcode-block" id="FieldProperty"><a class="viewcode-back" href="../../api.html#suitcase.fields.FieldProperty">[docs]</a><span class="k">class</span> <span class="nc">FieldProperty</span><span class="p">(</span><span class="n">BaseField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Provide the ability to define &quot;Property&quot; getter/setters for other fields</span>
+
+<span class="sd">    This is useful and preferable and preferable to inheritance if you want</span>
+<span class="sd">    to provide a different interface for getting/setting one some field</span>
+<span class="sd">    within a message.  Take the test case as an example::</span>
+
+<span class="sd">        # define the message</span>
+<span class="sd">        class MyMessage(Structure):</span>
+<span class="sd">            _version = UBByteSequence(2)</span>
+<span class="sd">            version = FieldProperty(_version,</span>
+<span class="sd">                                    onget=lambda v: &quot;%d.%02d&quot; % (v[0], v[1]),</span>
+<span class="sd">                                    onset=lambda v: tuple(int(x) for x</span>
+<span class="sd">                                                          in v.split(&quot;.&quot;, 1)))</span>
+
+<span class="sd">        msg = MyMessage()</span>
+<span class="sd">        msg.unpack(&#39;\x10\x03&#39;)</span>
+<span class="sd">        self.assertEqual(msg._version,(16, 3))</span>
+<span class="sd">        self.assertEqual(msg.version, &quot;16.03&quot;)</span>
+
+<span class="sd">        msg.version = &quot;22.7&quot;</span>
+<span class="sd">        self.assertEqual(msg._version, (22, 7))</span>
+<span class="sd">        self.assertEqual(msg.version, &quot;22.07&quot;)</span>
+
+<span class="sd">    :param field: The field that is wrapped by this FieldProperty.  The value</span>
+<span class="sd">        of this field is passed into or set by the associated get/set fns.</span>
+<span class="sd">    :param onget: This is a function pointer to a function called to mutate</span>
+<span class="sd">        the value returned on field access.  The function receives a single</span>
+<span class="sd">        argument containing the value of the wrapped field.</span>
+<span class="sd">    :oaram onset: This is a function pointer to a function called to map</span>
+<span class="sd">        between the property and the underlying field.  The function takes</span>
+<span class="sd">        a single parameter which is the value the property was set to.  It</span>
+<span class="sd">        should return the value that the underlying field expects (or raise</span>
+<span class="sd">        an exception if appropriate).</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">onget</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">onset</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">BaseField</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">onget</span> <span class="o">=</span> <span class="n">onget</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">onset</span> <span class="o">=</span> <span class="n">onset</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ph2f</span><span class="p">(</span><span class="n">field</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bytes_required</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">def</span> <span class="nf">_default_onget</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">value</span>
+
+    <span class="k">def</span> <span class="nf">_default_onset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">value</span>
+
+    <span class="k">def</span> <span class="nf">getval</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">onget</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">onget</span>
+        <span class="k">if</span> <span class="n">onget</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">onget</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_default_onget</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">field</span><span class="o">.</span><span class="n">getval</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">onget</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">setval</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="n">onset</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">onset</span>
+        <span class="k">if</span> <span class="n">onset</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">onset</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_default_onset</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">field</span><span class="o">.</span><span class="n">setval</span><span class="p">(</span><span class="n">onset</span><span class="p">(</span><span class="n">value</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">unpack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="nf">pack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+</div>
+<div class="viewcode-block" id="DispatchField"><a class="viewcode-back" href="../../api.html#suitcase.fields.DispatchField">[docs]</a><span class="k">class</span> <span class="nc">DispatchField</span><span class="p">(</span><span class="n">BaseField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Decorate a field as a dispatch byte (used as conditional)</span>
+
+<span class="sd">    A DispatchField is always used with a DispatchTarget within the same</span>
+<span class="sd">    message (at some level).</span>
+
+<span class="sd">    Example::</span>
+
+<span class="sd">        class MyMessage(Structure):</span>
+<span class="sd">            type = DispatchField(UBInt8())</span>
+<span class="sd">            body = DispatchTarget(dispatch_field=type, dispatch_mapping={</span>
+<span class="sd">                0x00: MessageType0,</span>
+<span class="sd">                0x01: MessageType1,</span>
+<span class="sd">            })</span>
+
+<span class="sd">    :param field: The field containing the dispatch parameter.  This is</span>
+<span class="sd">        typically an integer but could be any hashable object.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">BaseField</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">field</span> <span class="o">=</span> <span class="n">field</span><span class="o">.</span><span class="n">create_instance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">bytes_required</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">field</span><span class="o">.</span><span class="n">bytes_required</span>
+
+    <span class="k">def</span> <span class="nf">getval</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">field</span><span class="o">.</span><span class="n">getval</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">setval</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">field</span><span class="o">.</span><span class="n">setval</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">repr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">field</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">pack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">field</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="n">stream</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">unpack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">bytes_required</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">field</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+</div>
+<div class="viewcode-block" id="DispatchTarget"><a class="viewcode-back" href="../../api.html#suitcase.fields.DispatchTarget">[docs]</a><span class="k">class</span> <span class="nc">DispatchTarget</span><span class="p">(</span><span class="n">BaseField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Represent a conditional branch on some DispatchField</span>
+
+<span class="sd">    Example::</span>
+
+<span class="sd">        class MyMessage(Structure):</span>
+<span class="sd">            type = DispatchField(UBInt8())</span>
+<span class="sd">            body = DispatchTarget(dispatch_field=type, dispatch_mapping={</span>
+<span class="sd">                0x00: MessageType0,</span>
+<span class="sd">                0x01: MessageType1,</span>
+<span class="sd">            })</span>
+
+<span class="sd">    :param length_provider: The field providing a length value binding this</span>
+<span class="sd">        message (if any).  Set this field to None to leave unconstrained.</span>
+<span class="sd">    :param dispatch_field: The field being target for dispatch.  In most</span>
+<span class="sd">        protocols this is an integer type byte or something similar.  The</span>
+<span class="sd">        possible values for this field act as the keys for the dispatch.</span>
+<span class="sd">    :param dispatch_mapping: This is a dictionary mapping dispatch_field</span>
+<span class="sd">        values to associated message types to handle the remaining processing.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">length_provider</span><span class="p">,</span> <span class="n">dispatch_field</span><span class="p">,</span>
+                 <span class="n">dispatch_mapping</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">BaseField</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">length_provider</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">length_provider</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">length_provider</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ph2f</span><span class="p">(</span><span class="n">length_provider</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">length_provider</span><span class="o">.</span><span class="n">associate_length_consumer</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dispatch_field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ph2f</span><span class="p">(</span><span class="n">dispatch_field</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dispatch_mapping</span> <span class="o">=</span> <span class="n">dispatch_mapping</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">inverse_dispatch_mapping</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">((</span><span class="n">v</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span> <span class="k">for</span> <span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span>
+                                             <span class="ow">in</span> <span class="n">dispatch_mapping</span><span class="o">.</span><span class="n">items</span><span class="p">())</span>
+
+    <span class="k">def</span> <span class="nf">_lookup_msg_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">target_key</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dispatch_field</span><span class="o">.</span><span class="n">getval</span><span class="p">()</span>
+        <span class="n">target</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dispatch_mapping</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">target_key</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">target</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">target</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dispatch_mapping</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">None</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">target</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">bytes_required</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">length_provider</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">length_provider</span><span class="o">.</span><span class="n">get_adjusted_length</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">getval</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_value</span>
+
+    <span class="k">def</span> <span class="nf">setval</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">vtype</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="n">key</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">inverse_dispatch_mapping</span><span class="p">[</span><span class="n">vtype</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">SuitcaseProgrammingError</span><span class="p">(</span><span class="s">&quot;The type specified is not in the &quot;</span>
+                                           <span class="s">&quot;dispatch table&quot;</span><span class="p">)</span>
+
+        <span class="c"># OK, things check out.  Set both the value here and the</span>
+        <span class="c"># type byte value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_value</span> <span class="o">=</span> <span class="n">value</span>
+        <span class="n">value</span><span class="o">.</span><span class="n">_parent</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parent</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dispatch_field</span><span class="o">.</span><span class="n">setval</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">pack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="o">.</span><span class="n">_packer</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">stream</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">unpack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="n">target_msg_type</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lookup_msg_type</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">target_msg_type</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">target_msg_type</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dispatch_mapping</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">target_msg_type</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>  <span class="c"># still none</span>
+            <span class="k">raise</span> <span class="n">SuitcaseParseError</span><span class="p">(</span><span class="s">&quot;Input data contains type byte not&quot;</span>
+                                     <span class="s">&quot; contained in mapping&quot;</span><span class="p">)</span>
+        <span class="n">message_instance</span> <span class="o">=</span> <span class="n">target_msg_type</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">setval</span><span class="p">(</span><span class="n">message_instance</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+</div>
+<div class="viewcode-block" id="LengthField"><a class="viewcode-back" href="../../api.html#suitcase.fields.LengthField">[docs]</a><span class="k">class</span> <span class="nc">LengthField</span><span class="p">(</span><span class="n">BaseField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Wraps an existing field marking it as a LengthField</span>
+
+<span class="sd">    This field wraps another field which is assumed to return an</span>
+<span class="sd">    integer value.  A LengthField can be pointed to by a variable</span>
+<span class="sd">    length field and the two will be coupled appropriately.</span>
+
+<span class="sd">    :param length_field: The field providing the actual length value to</span>
+<span class="sd">        be used.  This field should return an integer value representing</span>
+<span class="sd">        the length (or a multiple of the length) as a return value</span>
+<span class="sd">    :param get_length: If specified, this is a function which takes a reference</span>
+<span class="sd">        to the encapsulated field and is responsible for reading the length</span>
+<span class="sd">        out from that field.  By default, this just reads the value of the</span>
+<span class="sd">        field (field is expected to be an integral value).</span>
+<span class="sd">    :param set_length: If specified, this is a function which takes a reference</span>
+<span class="sd">        to the encapsulated field and a length value.  Its responsibility</span>
+<span class="sd">        is to move the provided length value into the field.  By default,</span>
+<span class="sd">        the length value is just assigned to the field via `setval()`.</span>
+<span class="sd">    :param multiplier: If specified, this multiplier is applied to the</span>
+<span class="sd">        length.  If I specify a multiplier of 8, I am saying that each bit</span>
+<span class="sd">        in the length field represents 8 bytes of actual payload length. By</span>
+<span class="sd">        default the multiplier is 1 (1 bit/byte).</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">length_field</span><span class="p">,</span> <span class="n">get_length</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">set_length</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">multiplier</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">BaseField</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">multiplier</span> <span class="o">=</span> <span class="n">multiplier</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_length</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_default_get_length</span> <span class="k">if</span> <span class="n">get_length</span> <span class="ow">is</span> <span class="bp">None</span> <span class="k">else</span> <span class="n">get_length</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_length</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_default_set_length</span> <span class="k">if</span> <span class="n">set_length</span> <span class="ow">is</span> <span class="bp">None</span> <span class="k">else</span> <span class="n">set_length</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">length_field</span> <span class="o">=</span> <span class="n">length_field</span><span class="o">.</span><span class="n">create_instance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">length_value_provider</span> <span class="o">=</span> <span class="bp">None</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">repr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">length_field</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_default_get_length</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">field</span><span class="o">.</span><span class="n">getval</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_default_set_length</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">length</span><span class="p">):</span>
+        <span class="n">field</span><span class="o">.</span><span class="n">_value</span> <span class="o">=</span> <span class="n">length</span>  <span class="c"># TODO: use setval() [problem with DependentField tests]?</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">bytes_required</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">length_field</span><span class="o">.</span><span class="n">bytes_required</span>
+
+    <span class="k">def</span> <span class="nf">getval</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">length_field</span><span class="o">.</span><span class="n">getval</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">setval</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">SuitcaseProgrammingError</span><span class="p">(</span><span class="s">&quot;Cannot set the value of a LengthField&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">associate_length_consumer</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target_field</span><span class="p">):</span>
+        <span class="k">def</span> <span class="nf">_length_value_provider</span><span class="p">():</span>
+            <span class="n">sio</span> <span class="o">=</span> <span class="n">BytesIO</span><span class="p">()</span>
+            <span class="n">target_field</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="n">sio</span><span class="p">)</span>
+            <span class="n">target_field_length</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">sio</span><span class="o">.</span><span class="n">getvalue</span><span class="p">())</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">target_field_length</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">multiplier</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">SuitcaseProgrammingError</span><span class="p">(</span><span class="s">&quot;Payload length not divisible &quot;</span>
+                                               <span class="s">&quot;by </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">multiplier</span><span class="p">)</span>
+            <span class="k">return</span> <span class="p">(</span><span class="n">target_field_length</span> <span class="o">//</span> <span class="bp">self</span><span class="o">.</span><span class="n">multiplier</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">length_value_provider</span> <span class="o">=</span> <span class="n">_length_value_provider</span>
+
+    <span class="k">def</span> <span class="nf">pack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">length_value_provider</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">SuitcaseException</span><span class="p">(</span><span class="s">&quot;No length_provider added to this LengthField&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_length</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">length_field</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">length_value_provider</span><span class="p">())</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">length_field</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="n">stream</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">unpack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">bytes_required</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">length_field</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">get_adjusted_length</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_length</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">length_field</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">multiplier</span>
+
+</div>
+<div class="viewcode-block" id="TypeField"><a class="viewcode-back" href="../../api.html#suitcase.fields.TypeField">[docs]</a><span class="k">class</span> <span class="nc">TypeField</span><span class="p">(</span><span class="n">BaseField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Wraps an existing field marking it as a TypeField</span>
+
+<span class="sd">    This field wraps another field which is assumed to return an</span>
+<span class="sd">    integer value.  A TypeField can be pointed to by a variable</span>
+<span class="sd">    length field and will fix that field&#39;s length.</span>
+
+<span class="sd">    :param type_field: The field providing the type id that will</span>
+<span class="sd">        be used to lookup a length value</span>
+<span class="sd">    :param length_mapping: This is a dictionary mapping type_field</span>
+<span class="sd">        values to associated length values.</span>
+
+<span class="sd">    For example, a TypeField could be used as a replacement for a</span>
+<span class="sd">    DispatchField so that the associated DispatchTarget is non-greedy,</span>
+<span class="sd">    without the existence of a seperate LengthField. This enables</span>
+<span class="sd">    a greedy field to follow the dispatch field, without the usage of</span>
+<span class="sd">    complex ConditionalField setups::</span>
+
+<span class="sd">        class Structure8Bit(Structure):</span>
+<span class="sd">            value = UBInt8()</span>
+
+<span class="sd">        class Structure16Bit(Structure):</span>
+<span class="sd">            value = UBInt16()</span>
+
+<span class="sd">        class DispatchStructure(Structure):</span>
+<span class="sd">            type = TypeField(UBInt8(), {0x40: 1,</span>
+<span class="sd">                                        0x80: 2})</span>
+<span class="sd">            # Here the TypeField is providing both a size and type id</span>
+<span class="sd">            dispatch = DispatchTarget(type, type, {0x40: Structure8Bit,</span>
+<span class="sd">                                                   0x80: Structure16Bit})</span>
+<span class="sd">            greedy = Payload()</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">type_field</span><span class="p">,</span> <span class="n">length_mapping</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">BaseField</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">type_field</span> <span class="o">=</span> <span class="n">type_field</span><span class="o">.</span><span class="n">create_instance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">length_mapping</span> <span class="o">=</span> <span class="n">length_mapping</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">length_value_provider</span> <span class="o">=</span> <span class="bp">None</span>
+
+    <span class="k">def</span> <span class="nf">_lookup_msg_length</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">target_key</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">type_field</span><span class="o">.</span><span class="n">getval</span><span class="p">()</span>
+        <span class="n">target_length</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">length_mapping</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">target_key</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">target_length</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">target_length</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">length_mapping</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">None</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">target_length</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">repr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">type_field</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">bytes_required</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">type_field</span><span class="o">.</span><span class="n">bytes_required</span>
+
+    <span class="k">def</span> <span class="nf">getval</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">type_field</span><span class="o">.</span><span class="n">getval</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">setval</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">type_field</span><span class="o">.</span><span class="n">setval</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">associate_length_consumer</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target_field</span><span class="p">):</span>
+        <span class="k">def</span> <span class="nf">_length_value_provider</span><span class="p">():</span>
+            <span class="n">sio</span> <span class="o">=</span> <span class="n">BytesIO</span><span class="p">()</span>
+            <span class="n">target_field</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="n">sio</span><span class="p">)</span>
+            <span class="n">target_field_length</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">sio</span><span class="o">.</span><span class="n">getvalue</span><span class="p">())</span>
+            <span class="k">if</span> <span class="n">target_field_length</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_adjusted_length</span><span class="p">():</span>
+                <span class="k">raise</span> <span class="n">SuitcaseProgrammingError</span><span class="p">(</span><span class="s">&quot;Payload length </span><span class="si">%i</span><span class="s"> does not&quot;</span>
+                                               <span class="s">&quot; match length </span><span class="si">%i</span><span class="s"> specified by type&quot;</span>
+                                               <span class="o">%</span> <span class="p">(</span><span class="n">target_field_length</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_adjusted_length</span><span class="p">()))</span>
+            <span class="k">return</span> <span class="n">target_field_length</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">length_value_provider</span> <span class="o">=</span> <span class="n">_length_value_provider</span>
+
+    <span class="k">def</span> <span class="nf">pack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">length_value_provider</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">SuitcaseException</span><span class="p">(</span><span class="s">&quot;No length_provider added to this TypeField&quot;</span><span class="p">)</span>
+        <span class="c"># This will throw a SuitcasePackException if the length is not correct</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">length_value_provider</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">type_field</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="n">stream</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">unpack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">bytes_required</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">type_field</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">get_adjusted_length</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lookup_msg_length</span><span class="p">()</span>
+
+</div>
+<div class="viewcode-block" id="ConditionalField"><a class="viewcode-back" href="../../api.html#suitcase.fields.ConditionalField">[docs]</a><span class="k">class</span> <span class="nc">ConditionalField</span><span class="p">(</span><span class="n">BaseField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Field which may or may not be included depending on some condition</span>
+
+<span class="sd">    In some protocols, there exist fields which may or may not be present</span>
+<span class="sd">    depending on the values of other fields that would have already been</span>
+<span class="sd">    parsed at this point in time.  Wrapping such fields in  a ConditionalField</span>
+<span class="sd">    allows us to define a function to examine that state and only have the</span>
+<span class="sd">    field capture the bytes if the conditions are right.</span>
+
+<span class="sd">    :param field: The field which should handle the parsing if the condition</span>
+<span class="sd">        evaluates to true.</span>
+
+<span class="sd">    :param condition: This is a function which is given access to the parent</span>
+<span class="sd">        message that is expected to return a boolean value.  If the value</span>
+<span class="sd">        is true, then ``field`` will handle the bytes.  If not, then the</span>
+<span class="sd">        field will be skipped and left with its default value (None).</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">condition</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">BaseField</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">field</span> <span class="o">=</span> <span class="n">field</span><span class="o">.</span><span class="n">create_instance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">condition</span> <span class="o">=</span> <span class="n">condition</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">condition</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="p">):</span>
+            <span class="k">return</span> <span class="nb">repr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">field</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s">&quot;&lt;ConditionalField: not included&gt;&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">bytes_required</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">condition</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">field</span><span class="o">.</span><span class="n">bytes_required</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mi">0</span>
+
+    <span class="k">def</span> <span class="nf">pack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">condition</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">field</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="n">stream</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">unpack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">condition</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">field</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">getval</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">field</span><span class="o">.</span><span class="n">getval</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">setval</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">field</span><span class="o">.</span><span class="n">setval</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">associate_length_consumer</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target_field</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">field</span><span class="o">.</span><span class="n">associate_length_consumer</span><span class="p">(</span><span class="n">target_field</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">get_adjusted_length</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">field</span><span class="o">.</span><span class="n">get_adjusted_length</span><span class="p">()</span>
+
+</div>
+<div class="viewcode-block" id="Payload"><a class="viewcode-back" href="../../api.html#suitcase.fields.Payload">[docs]</a><span class="k">class</span> <span class="nc">Payload</span><span class="p">(</span><span class="n">BaseField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Variable length raw (byte string) field</span>
+
+<span class="sd">    This field is expected to be used with a LengthField.  The variable</span>
+<span class="sd">    length field provides a value to be used by the LengthField on</span>
+<span class="sd">    message pack and vice-versa for unpack.</span>
+
+<span class="sd">    :param length_provider: The LengthField with which this variable</span>
+<span class="sd">        length payload is associated.  If not included, it is assumed that</span>
+<span class="sd">        the length_provider should consume the remainder of the bytes</span>
+<span class="sd">        available in the string.  This is only valid in cases where the</span>
+<span class="sd">        developer knows that they will be dealing with a fixed sequence</span>
+<span class="sd">        of bytes (already boxed).</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">length_provider</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">BaseField</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">length_provider</span><span class="p">,</span> <span class="n">FieldPlaceholder</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">length_provider</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ph2f</span><span class="p">(</span><span class="n">length_provider</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">length_provider</span><span class="o">.</span><span class="n">associate_length_consumer</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">length_provider</span> <span class="o">=</span> <span class="bp">None</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">bytes_required</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">length_provider</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">length_provider</span><span class="o">.</span><span class="n">get_adjusted_length</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">pack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">):</span>
+        <span class="n">stream</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">unpack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_value</span> <span class="o">=</span> <span class="n">data</span>
+
+
+<span class="c"># keep for backwards compatibility</span></div>
+<span class="n">VariableRawPayload</span> <span class="o">=</span> <span class="n">Payload</span>
+
+
+<span class="k">class</span> <span class="nc">BaseVariableByteSequence</span><span class="p">(</span><span class="n">BaseField</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">make_format</span><span class="p">,</span> <span class="n">length_provider</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">BaseField</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">make_format</span> <span class="o">=</span> <span class="n">make_format</span>
+        <span class="k">if</span> <span class="n">length_provider</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">length_provider</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ph2f</span><span class="p">(</span><span class="n">length_provider</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">length_provider</span><span class="o">.</span><span class="n">associate_length_consumer</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">bytes_required</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">length_provider</span><span class="o">.</span><span class="n">get_adjusted_length</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">pack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">):</span>
+        <span class="n">sfmt</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_format</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="p">))</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">stream</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">struct</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="n">sfmt</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="p">))</span>
+        <span class="k">except</span> <span class="n">struct</span><span class="o">.</span><span class="n">error</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">SuitcasePackStructException</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">unpack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">bytes_required</span>
+
+        <span class="n">length</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bytes_required</span>
+        <span class="n">sfmt</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_format</span><span class="p">(</span><span class="n">length</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_value</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="n">sfmt</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">struct</span><span class="o">.</span><span class="n">error</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">SuitcasePackStructException</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="DependentField"><a class="viewcode-back" href="../../api.html#suitcase.fields.DependentField">[docs]</a><span class="k">class</span> <span class="nc">DependentField</span><span class="p">(</span><span class="n">BaseField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Field populated by container packet at lower level</span>
+
+<span class="sd">    It is sometimes the case that information from another layer of a</span>
+<span class="sd">    messaging protocol be needed at another higher-level of the protocol.</span>
+<span class="sd">    The DependentField is a way of declaring that a message at some layer</span>
+<span class="sd">    is dependent on a field with some name from the parent layer.</span>
+
+<span class="sd">    For instance, let&#39;s suppose that my protocol had an option byte that</span>
+<span class="sd">    I wanted to include in some logic handling packets at some higher</span>
+<span class="sd">    layer.  I could include that byte in my message as follows::</span>
+
+<span class="sd">        class MyDependentMessage(Structure):</span>
+<span class="sd">            ll_options = DependentField(&#39;proto_options&#39;)</span>
+<span class="sd">            data = UBInt8Sequence(16)</span>
+
+<span class="sd">        class LowerLevelProtocol(Structure):</span>
+<span class="sd">            type = DispatchField(UBInt16())</span>
+<span class="sd">            proto_options = UBInt8()</span>
+<span class="sd">            body = DispatchTarget(None, type, {</span>
+<span class="sd">                0x00: MyDependentMessage,</span>
+<span class="sd">            })</span>
+
+<span class="sd">    :param name: The name of the field from the parent message that we</span>
+<span class="sd">        would like brought into our message namespace.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">BaseField</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bytes_required</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parent_field_name</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parent_field</span> <span class="o">=</span> <span class="bp">None</span>
+
+    <span class="k">def</span> <span class="nf">_get_parent_field</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent_field</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">message_parent</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="o">.</span><span class="n">_parent</span>
+            <span class="n">target_field</span> <span class="o">=</span> <span class="n">message_parent</span><span class="o">.</span><span class="n">lookup_field_by_name</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">parent_field_name</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parent_field</span> <span class="o">=</span> <span class="n">target_field</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent_field</span>
+
+    <span class="k">def</span> <span class="nf">__getattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attr</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_parent_field</span><span class="p">(),</span> <span class="n">attr</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">pack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="nf">unpack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="nf">getval</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_parent_field</span><span class="p">()</span><span class="o">.</span><span class="n">getval</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">setval</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_parent_field</span><span class="p">()</span><span class="o">.</span><span class="n">setval</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+</div>
+<div class="viewcode-block" id="SubstructureField"><a class="viewcode-back" href="../../api.html#suitcase.fields.SubstructureField">[docs]</a><span class="k">class</span> <span class="nc">SubstructureField</span><span class="p">(</span><span class="n">BaseField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Field which contains another non-greedy Structure.</span>
+
+<span class="sd">    Often data-types are needed which cannot be easily</span>
+<span class="sd">    described by a single field, but are representable as</span>
+<span class="sd">    Structures. For example, Pascal style strings are prefixed</span>
+<span class="sd">    with their length. It is often desirable to embed these</span>
+<span class="sd">    data-types within another Structure, to avoid reimplementing</span>
+<span class="sd">    them in every usage.</span>
+
+
+<span class="sd">    A Pascal style string could be described as follows::</span>
+
+<span class="sd">        from suitcase.structure import Structure</span>
+<span class="sd">        from suitcase.fields import Payload, UBInt16, LengthField, SubstructureField</span>
+
+<span class="sd">        class PascalString16(Structure):</span>
+<span class="sd">            length = LengthField(UBInt16())</span>
+<span class="sd">            value = Payload(length)</span>
+
+<span class="sd">    A structure describing a name of a person might consist of two</span>
+<span class="sd">    Pascal style strings. Instead of describing the ugly way::</span>
+
+<span class="sd">        class NameUgly(Structure):</span>
+<span class="sd">            first_length = LengthField(UBInt16())</span>
+<span class="sd">            first_value = Payload(first_length)</span>
+<span class="sd">            last_length = LengthField(UBInt16())</span>
+<span class="sd">            last_value = Payload(last_length)</span>
+
+<span class="sd">    it could be defined using a SubstructureField::</span>
+
+<span class="sd">        class Name(Structure):</span>
+<span class="sd">            first = SubstructureField(PascalString16)</span>
+<span class="sd">            last = SubstructureField(PascalString16)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">substructure</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">BaseField</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">substructure</span> <span class="o">=</span> <span class="n">substructure</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_value</span> <span class="o">=</span> <span class="n">substructure</span><span class="p">()</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">bytes_required</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c"># We return None but do not count as a greedy field to the packer</span>
+        <span class="k">return</span> <span class="bp">None</span>
+
+    <span class="k">def</span> <span class="nf">pack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">):</span>
+        <span class="n">stream</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="o">.</span><span class="n">pack</span><span class="p">())</span>
+
+    <span class="k">def</span> <span class="nf">unpack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">trailing</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">substructure</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">trailing</span><span class="p">)</span>
+
+</div>
+<div class="viewcode-block" id="FieldArray"><a class="viewcode-back" href="../../api.html#suitcase.fields.FieldArray">[docs]</a><span class="k">class</span> <span class="nc">FieldArray</span><span class="p">(</span><span class="n">BaseField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Field which contains a list of some other field.</span>
+
+<span class="sd">    In some protocols, there exist repeated substructures which are present in a</span>
+<span class="sd">    variable number. The variable nature of these fields make a DispatchField</span>
+<span class="sd">    and DispatchTarget combination unsuitable; instead a FieldArray may be</span>
+<span class="sd">    used to pack/unpack these fields to/from a list.</span>
+
+<span class="sd">    :param substructure: The type of the array element. Must not be a greedy</span>
+<span class="sd">        field, or else the array will only ever have one element containing</span>
+<span class="sd">        the entire contents of the array.</span>
+<span class="sd">    :param length_provider: The field providing a length value binding this</span>
+<span class="sd">        message (if any).  Set this field to None to leave unconstrained.</span>
+
+<span class="sd">    For example, one can imagine a message listing the zipcodes covered by</span>
+<span class="sd">    a telephone area code. Depending on the population density, the number</span>
+<span class="sd">    of zipcodes per area code could vary greatly. One implementation of this</span>
+<span class="sd">    data structure could be::</span>
+
+<span class="sd">        from suitcase.structure import Structure</span>
+<span class="sd">        from suitcase.fields import UBInt16, FieldArray</span>
+
+<span class="sd">        class ZipcodeStructure(Structure):</span>
+<span class="sd">            zipcode = UBInt16()</span>
+
+<span class="sd">        class TelephoneZipcodes(Structure):</span>
+<span class="sd">            areacode = UBInt16()</span>
+<span class="sd">            zipcodes = FieldArray(ZipcodeStructure)  # variable number of zipcodes</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">substructure</span><span class="p">,</span> <span class="n">length_provider</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">BaseField</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">substructure</span> <span class="o">=</span> <span class="n">substructure</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_value</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">length_provider</span><span class="p">,</span> <span class="n">FieldPlaceholder</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">length_provider</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ph2f</span><span class="p">(</span><span class="n">length_provider</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">length_provider</span><span class="o">.</span><span class="n">associate_length_consumer</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">length_provider</span> <span class="o">=</span> <span class="bp">None</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">bytes_required</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">length_provider</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">length_provider</span><span class="o">.</span><span class="n">get_adjusted_length</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">pack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">structure</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="p">:</span>
+            <span class="n">stream</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">structure</span><span class="o">.</span><span class="n">pack</span><span class="p">())</span>
+
+    <span class="k">def</span> <span class="nf">unpack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="k">while</span> <span class="bp">True</span><span class="p">:</span>
+            <span class="n">structure</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">substructure</span><span class="p">()</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="n">structure</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">trailing</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">structure</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">data</span> <span class="o">==</span> <span class="n">b</span><span class="s">&quot;&quot;</span><span class="p">:</span>
+                <span class="k">break</span>
+
+</div>
+<div class="viewcode-block" id="BaseFixedByteSequence"><a class="viewcode-back" href="../../api.html#suitcase.fields.BaseFixedByteSequence">[docs]</a><span class="k">class</span> <span class="nc">BaseFixedByteSequence</span><span class="p">(</span><span class="n">BaseField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Base fixed-length byte sequence field&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">make_format</span><span class="p">,</span> <span class="n">size</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">BaseField</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bytes_required</span> <span class="o">=</span> <span class="n">size</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">format</span> <span class="o">=</span> <span class="n">make_format</span><span class="p">(</span><span class="n">size</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">pack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">stream</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">struct</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="p">))</span>
+        <span class="k">except</span> <span class="n">struct</span><span class="o">.</span><span class="n">error</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">SuitcasePackStructException</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">unpack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_value</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">struct</span><span class="o">.</span><span class="n">error</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">SuitcasePackStructException</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+
+</div>
+<span class="k">def</span> <span class="nf">byte_sequence_factory_factory</span><span class="p">(</span><span class="n">make_format</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">byte_sequence_factory</span><span class="p">(</span><span class="n">length_or_provider</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">length_or_provider</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">BaseFixedByteSequence</span><span class="p">(</span><span class="n">make_format</span><span class="p">,</span> <span class="n">length_or_provider</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">BaseVariableByteSequence</span><span class="p">(</span><span class="n">make_format</span><span class="p">,</span> <span class="n">length_or_provider</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">byte_sequence_factory</span>
+
+
+<span class="n">UBInt8Sequence</span> <span class="o">=</span> <span class="n">byte_sequence_factory_factory</span><span class="p">(</span><span class="k">lambda</span> <span class="n">l</span><span class="p">:</span> <span class="s">&quot;&gt;&quot;</span> <span class="o">+</span> <span class="s">&quot;B&quot;</span> <span class="o">*</span> <span class="n">l</span><span class="p">)</span>
+<span class="n">ULInt8Sequence</span> <span class="o">=</span> <span class="n">byte_sequence_factory_factory</span><span class="p">(</span><span class="k">lambda</span> <span class="n">l</span><span class="p">:</span> <span class="s">&quot;&lt;&quot;</span> <span class="o">+</span> <span class="s">&quot;B&quot;</span> <span class="o">*</span> <span class="n">l</span><span class="p">)</span>
+<span class="n">SBInt8Sequence</span> <span class="o">=</span> <span class="n">byte_sequence_factory_factory</span><span class="p">(</span><span class="k">lambda</span> <span class="n">l</span><span class="p">:</span> <span class="s">&quot;&gt;&quot;</span> <span class="o">+</span> <span class="s">&quot;b&quot;</span> <span class="o">*</span> <span class="n">l</span><span class="p">)</span>
+<span class="n">SLInt8Sequence</span> <span class="o">=</span> <span class="n">byte_sequence_factory_factory</span><span class="p">(</span><span class="k">lambda</span> <span class="n">l</span><span class="p">:</span> <span class="s">&quot;&lt;&quot;</span> <span class="o">+</span> <span class="s">&quot;b&quot;</span> <span class="o">*</span> <span class="n">l</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="BaseStructField"><a class="viewcode-back" href="../../api.html#suitcase.fields.BaseStructField">[docs]</a><span class="k">class</span> <span class="nc">BaseStructField</span><span class="p">(</span><span class="n">BaseField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Base for fields based very directly on python struct module formats</span>
+
+<span class="sd">    It is expected that this class will be subclassed and customized by</span>
+<span class="sd">    defining ``FORMAT`` at the class level.  ``FORMAT`` is expected to</span>
+<span class="sd">    be a format string that could be used with struct.pack/unpack.  It</span>
+<span class="sd">    should include endianness information.  If the ``FORMAT`` includes</span>
+<span class="sd">    multiple elements, the default ``_unpack`` logic assumes that each</span>
+<span class="sd">    element is a single byte and will OR these together.  To specialize</span>
+<span class="sd">    this, _unpack should be overridden.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">BaseField</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_value</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_keep_bytes</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s">&quot;KEEP_BYTES&quot;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_keep_bytes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bytes_required</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_keep_bytes</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bytes_required</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">calcsize</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">PACK_FORMAT</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">pack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">keep_bytes</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s">&#39;KEEP_BYTES&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">keep_bytes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">PACK_FORMAT</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">b</span><span class="s">&quot;&gt;&quot;</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>  <span class="c"># The element access makes this compatible with Python 2 and 3</span>
+                    <span class="n">to_write</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">PACK_FORMAT</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="p">)[</span><span class="o">-</span><span class="n">keep_bytes</span><span class="p">:]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">to_write</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">PACK_FORMAT</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="p">)[:</span><span class="n">keep_bytes</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">to_write</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">PACK_FORMAT</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">struct</span><span class="o">.</span><span class="n">error</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">SuitcasePackStructException</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+        <span class="n">stream</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">to_write</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">unpack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">UNPACK_FORMAT</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">b</span><span class="s">&quot;&gt;&quot;</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>  <span class="c"># The element access makes this compatible with Python 2 and 3</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">byte</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">reversed</span><span class="p">(</span><span class="n">struct</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">UNPACK_FORMAT</span><span class="p">,</span> <span class="n">data</span><span class="p">))):</span>
+                <span class="n">value</span> <span class="o">|=</span> <span class="p">(</span><span class="n">byte</span> <span class="o">&lt;&lt;</span> <span class="p">(</span><span class="n">i</span> <span class="o">*</span> <span class="mi">8</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">byte</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">struct</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">UNPACK_FORMAT</span><span class="p">,</span> <span class="n">data</span><span class="p">)):</span>
+                <span class="n">value</span> <span class="o">|=</span> <span class="p">(</span><span class="n">byte</span> <span class="o">&lt;&lt;</span> <span class="p">(</span><span class="n">i</span> <span class="o">*</span> <span class="mi">8</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_value</span> <span class="o">=</span> <span class="n">value</span>
+
+
+<span class="c"># ==============================================================================</span>
+<span class="c"># Unsigned Big Endian</span>
+<span class="c"># ==============================================================================</span></div>
+<div class="viewcode-block" id="UBInt8"><a class="viewcode-back" href="../../api.html#suitcase.fields.UBInt8">[docs]</a><span class="k">class</span> <span class="nc">UBInt8</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Unsigned Big Endian 8-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&gt;B&quot;</span>
+
+</div>
+<div class="viewcode-block" id="UBInt16"><a class="viewcode-back" href="../../api.html#suitcase.fields.UBInt16">[docs]</a><span class="k">class</span> <span class="nc">UBInt16</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Unsigned Big Endian 16-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&gt;H&quot;</span>
+
+</div>
+<div class="viewcode-block" id="UBInt24"><a class="viewcode-back" href="../../api.html#suitcase.fields.UBInt24">[docs]</a><span class="k">class</span> <span class="nc">UBInt24</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Unsigned Big Endian 24-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">KEEP_BYTES</span> <span class="o">=</span> <span class="mi">3</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&gt;I&quot;</span>
+    <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&gt;BBB&quot;</span>
+
+</div>
+<div class="viewcode-block" id="UBInt32"><a class="viewcode-back" href="../../api.html#suitcase.fields.UBInt32">[docs]</a><span class="k">class</span> <span class="nc">UBInt32</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Unsigned Big Endian 32-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&gt;I&quot;</span>
+
+</div>
+<div class="viewcode-block" id="UBInt40"><a class="viewcode-back" href="../../api.html#suitcase.fields.UBInt40">[docs]</a><span class="k">class</span> <span class="nc">UBInt40</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Unsigned Big Endian 40-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">KEEP_BYTES</span> <span class="o">=</span> <span class="mi">5</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&gt;Q&quot;</span>
+    <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&gt;BBBBB&quot;</span>
+
+</div>
+<div class="viewcode-block" id="UBInt48"><a class="viewcode-back" href="../../api.html#suitcase.fields.UBInt48">[docs]</a><span class="k">class</span> <span class="nc">UBInt48</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Unsigned Big Endian 48-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">KEEP_BYTES</span> <span class="o">=</span> <span class="mi">6</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&gt;Q&quot;</span>
+    <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&gt;BBBBBB&quot;</span>
+
+</div>
+<div class="viewcode-block" id="UBInt56"><a class="viewcode-back" href="../../api.html#suitcase.fields.UBInt56">[docs]</a><span class="k">class</span> <span class="nc">UBInt56</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Unsigned Big Endian 56-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">KEEP_BYTES</span> <span class="o">=</span> <span class="mi">7</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&gt;Q&quot;</span>
+    <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&gt;BBBBBBB&quot;</span>
+
+</div>
+<div class="viewcode-block" id="UBInt64"><a class="viewcode-back" href="../../api.html#suitcase.fields.UBInt64">[docs]</a><span class="k">class</span> <span class="nc">UBInt64</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Unsigned Big Endian 64-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&gt;Q&quot;</span>
+
+
+<span class="c"># ==============================================================================</span>
+<span class="c"># Signed Big Endian</span>
+<span class="c"># ==============================================================================</span></div>
+<div class="viewcode-block" id="SBInt8"><a class="viewcode-back" href="../../api.html#suitcase.fields.SBInt8">[docs]</a><span class="k">class</span> <span class="nc">SBInt8</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Signed Big Endian 8-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&gt;b&quot;</span>
+
+</div>
+<div class="viewcode-block" id="SBInt16"><a class="viewcode-back" href="../../api.html#suitcase.fields.SBInt16">[docs]</a><span class="k">class</span> <span class="nc">SBInt16</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Signed Big Endian 16-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&gt;h&quot;</span>
+
+</div>
+<div class="viewcode-block" id="SBInt24"><a class="viewcode-back" href="../../api.html#suitcase.fields.SBInt24">[docs]</a><span class="k">class</span> <span class="nc">SBInt24</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Signed Big Endian 24-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">KEEP_BYTES</span> <span class="o">=</span> <span class="mi">3</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&gt;i&quot;</span>
+    <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&gt;bBB&quot;</span>
+
+</div>
+<div class="viewcode-block" id="SBInt32"><a class="viewcode-back" href="../../api.html#suitcase.fields.SBInt32">[docs]</a><span class="k">class</span> <span class="nc">SBInt32</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Signed Big Endian 32-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&gt;i&quot;</span>
+
+</div>
+<div class="viewcode-block" id="SBInt40"><a class="viewcode-back" href="../../api.html#suitcase.fields.SBInt40">[docs]</a><span class="k">class</span> <span class="nc">SBInt40</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Signed Big Endian 40-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">KEEP_BYTES</span> <span class="o">=</span> <span class="mi">5</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&gt;q&quot;</span>
+    <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&gt;bBBBB&quot;</span>
+
+</div>
+<div class="viewcode-block" id="SBInt48"><a class="viewcode-back" href="../../api.html#suitcase.fields.SBInt48">[docs]</a><span class="k">class</span> <span class="nc">SBInt48</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Signed Big Endian 48-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">KEEP_BYTES</span> <span class="o">=</span> <span class="mi">6</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&gt;q&quot;</span>
+    <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&gt;bBBBBB&quot;</span>
+
+</div>
+<div class="viewcode-block" id="SBInt56"><a class="viewcode-back" href="../../api.html#suitcase.fields.SBInt56">[docs]</a><span class="k">class</span> <span class="nc">SBInt56</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Signed Big Endian 56-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">KEEP_BYTES</span> <span class="o">=</span> <span class="mi">7</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&gt;q&quot;</span>
+    <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&gt;bBBBBBB&quot;</span>
+
+</div>
+<div class="viewcode-block" id="SBInt64"><a class="viewcode-back" href="../../api.html#suitcase.fields.SBInt64">[docs]</a><span class="k">class</span> <span class="nc">SBInt64</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Signed Big Endian 64-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&gt;q&quot;</span>
+
+
+<span class="c"># ==============================================================================</span>
+<span class="c"># Unsigned Little Endian</span>
+<span class="c"># ==============================================================================</span></div>
+<div class="viewcode-block" id="ULInt8"><a class="viewcode-back" href="../../api.html#suitcase.fields.ULInt8">[docs]</a><span class="k">class</span> <span class="nc">ULInt8</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Unsigned Little Endian 8-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&lt;B&quot;</span>
+
+</div>
+<div class="viewcode-block" id="ULInt16"><a class="viewcode-back" href="../../api.html#suitcase.fields.ULInt16">[docs]</a><span class="k">class</span> <span class="nc">ULInt16</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Unsigned Little Endian 16-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&lt;H&quot;</span>
+
+</div>
+<div class="viewcode-block" id="ULInt24"><a class="viewcode-back" href="../../api.html#suitcase.fields.ULInt24">[docs]</a><span class="k">class</span> <span class="nc">ULInt24</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Unsigned Little Endian 24-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">KEEP_BYTES</span> <span class="o">=</span> <span class="mi">3</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&lt;I&quot;</span>
+    <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&lt;BBB&quot;</span>
+
+</div>
+<div class="viewcode-block" id="ULInt32"><a class="viewcode-back" href="../../api.html#suitcase.fields.ULInt32">[docs]</a><span class="k">class</span> <span class="nc">ULInt32</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Unsigned Little Endian 32-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&lt;I&quot;</span>
+
+</div>
+<div class="viewcode-block" id="ULInt40"><a class="viewcode-back" href="../../api.html#suitcase.fields.ULInt40">[docs]</a><span class="k">class</span> <span class="nc">ULInt40</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Unsigned Little Endian 40-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">KEEP_BYTES</span> <span class="o">=</span> <span class="mi">5</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&lt;Q&quot;</span>
+    <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&lt;BBBBB&quot;</span>
+
+</div>
+<div class="viewcode-block" id="ULInt48"><a class="viewcode-back" href="../../api.html#suitcase.fields.ULInt48">[docs]</a><span class="k">class</span> <span class="nc">ULInt48</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Unsigned Little Endian 48-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">KEEP_BYTES</span> <span class="o">=</span> <span class="mi">6</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&lt;Q&quot;</span>
+    <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&lt;BBBBBB&quot;</span>
+
+</div>
+<div class="viewcode-block" id="ULInt56"><a class="viewcode-back" href="../../api.html#suitcase.fields.ULInt56">[docs]</a><span class="k">class</span> <span class="nc">ULInt56</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Unsigned Little Endian 56-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">KEEP_BYTES</span> <span class="o">=</span> <span class="mi">7</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&lt;Q&quot;</span>
+    <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&lt;BBBBBBB&quot;</span>
+
+</div>
+<div class="viewcode-block" id="ULInt64"><a class="viewcode-back" href="../../api.html#suitcase.fields.ULInt64">[docs]</a><span class="k">class</span> <span class="nc">ULInt64</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Unsigned Little Endian 64-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&lt;Q&quot;</span>
+
+
+<span class="c"># ==============================================================================</span>
+<span class="c"># Signed Little Endian</span>
+<span class="c"># ==============================================================================</span></div>
+<div class="viewcode-block" id="SLInt8"><a class="viewcode-back" href="../../api.html#suitcase.fields.SLInt8">[docs]</a><span class="k">class</span> <span class="nc">SLInt8</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Signed Little Endian 8-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&lt;b&quot;</span>
+
+</div>
+<div class="viewcode-block" id="SLInt16"><a class="viewcode-back" href="../../api.html#suitcase.fields.SLInt16">[docs]</a><span class="k">class</span> <span class="nc">SLInt16</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Signed Little Endian 16-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&lt;h&quot;</span>
+
+</div>
+<div class="viewcode-block" id="SLInt24"><a class="viewcode-back" href="../../api.html#suitcase.fields.SLInt24">[docs]</a><span class="k">class</span> <span class="nc">SLInt24</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Signed Little Endian 24-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">KEEP_BYTES</span> <span class="o">=</span> <span class="mi">3</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&lt;i&quot;</span>
+    <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&lt;BBb&quot;</span>
+
+</div>
+<div class="viewcode-block" id="SLInt32"><a class="viewcode-back" href="../../api.html#suitcase.fields.SLInt32">[docs]</a><span class="k">class</span> <span class="nc">SLInt32</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Signed Little Endian 32-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&lt;i&quot;</span>
+
+</div>
+<div class="viewcode-block" id="SLInt40"><a class="viewcode-back" href="../../api.html#suitcase.fields.SLInt40">[docs]</a><span class="k">class</span> <span class="nc">SLInt40</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Signed Little Endian 40-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">KEEP_BYTES</span> <span class="o">=</span> <span class="mi">5</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&lt;q&quot;</span>
+    <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&lt;BBBBb&quot;</span>
+
+</div>
+<div class="viewcode-block" id="SLInt48"><a class="viewcode-back" href="../../api.html#suitcase.fields.SLInt48">[docs]</a><span class="k">class</span> <span class="nc">SLInt48</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Signed Little Endian 48-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">KEEP_BYTES</span> <span class="o">=</span> <span class="mi">6</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&lt;q&quot;</span>
+    <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&lt;BBBBBb&quot;</span>
+
+</div>
+<div class="viewcode-block" id="SLInt56"><a class="viewcode-back" href="../../api.html#suitcase.fields.SLInt56">[docs]</a><span class="k">class</span> <span class="nc">SLInt56</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Signed Little Endian 56-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">KEEP_BYTES</span> <span class="o">=</span> <span class="mi">7</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&lt;q&quot;</span>
+    <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&lt;BBBBBBb&quot;</span>
+
+</div>
+<div class="viewcode-block" id="SLInt64"><a class="viewcode-back" href="../../api.html#suitcase.fields.SLInt64">[docs]</a><span class="k">class</span> <span class="nc">SLInt64</span><span class="p">(</span><span class="n">BaseStructField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Signed Little Endian 64-bit integer field&quot;&quot;&quot;</span>
+    <span class="n">PACK_FORMAT</span> <span class="o">=</span> <span class="n">UNPACK_FORMAT</span> <span class="o">=</span> <span class="n">b</span><span class="s">&quot;&lt;q&quot;</span>
+
+
+<span class="c"># ==============================================================================</span>
+<span class="c"># BitField and Bits</span>
+<span class="c"># ==============================================================================</span></div>
+<span class="k">def</span> <span class="nf">bitfield_placeholder_factory_factory</span><span class="p">(</span><span class="n">cls</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">_factory_fn</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">cls</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">_factory_fn</span>
+
+
+<span class="k">class</span> <span class="nc">_BitFieldFieldPlaceholder</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="n">_global_seqno</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cls</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cls</span> <span class="o">=</span> <span class="n">cls</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">args</span> <span class="o">=</span> <span class="n">args</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kwargs</span> <span class="o">=</span> <span class="n">kwargs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sequence_number</span> <span class="o">=</span> <span class="n">_BitFieldFieldPlaceholder</span><span class="o">.</span><span class="n">_global_seqno</span>
+        <span class="n">_BitFieldFieldPlaceholder</span><span class="o">.</span><span class="n">_global_seqno</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="k">def</span> <span class="nf">create_instance</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">kwargs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">kwargs</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s">&#39;instantiate&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">True</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">cls</span><span class="p">(</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">kwargs</span><span class="p">)</span>
+
+
+<span class="k">class</span> <span class="nc">_BitFieldField</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">repr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">viewget</span><span class="p">())</span>
+
+    <span class="k">def</span> <span class="nf">__new__</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">if</span> <span class="s">&#39;instantiate&#39;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">super</span><span class="p">(</span><span class="n">_BitFieldField</span><span class="p">,</span> <span class="n">cls</span><span class="p">)</span><span class="o">.</span><span class="n">__new__</span><span class="p">(</span><span class="n">cls</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">_BitFieldFieldPlaceholder</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span>
+
+
+<span class="k">class</span> <span class="nc">_BitBool</span><span class="p">(</span><span class="n">_BitFieldField</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">_BitFieldField</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">size</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_value</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">def</span> <span class="nf">getval</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_value</span>
+
+    <span class="k">def</span> <span class="nf">setval</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_value</span> <span class="o">=</span> <span class="n">value</span>
+
+    <span class="k">def</span> <span class="nf">viewget</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_value</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">viewset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">value</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_value</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_value</span> <span class="o">=</span> <span class="mi">0</span>
+
+
+<span class="k">class</span> <span class="nc">_BitNum</span><span class="p">(</span><span class="n">_BitFieldField</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">size</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">_BitFieldField</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">size</span> <span class="o">=</span> <span class="n">size</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_value</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">def</span> <span class="nf">getval</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_value</span>
+
+    <span class="n">viewget</span> <span class="o">=</span> <span class="n">getval</span>
+
+    <span class="k">def</span> <span class="nf">setval</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_value</span> <span class="o">=</span> <span class="n">value</span>
+
+    <span class="n">viewset</span> <span class="o">=</span> <span class="n">setval</span>
+
+
+<span class="n">BitNum</span> <span class="o">=</span> <span class="n">bitfield_placeholder_factory_factory</span><span class="p">(</span><span class="n">_BitNum</span><span class="p">)</span>
+<span class="n">BitBool</span> <span class="o">=</span> <span class="n">bitfield_placeholder_factory_factory</span><span class="p">(</span><span class="n">_BitBool</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="BitField"><a class="viewcode-back" href="../../api.html#suitcase.fields.BitField">[docs]</a><span class="k">class</span> <span class="nc">BitField</span><span class="p">(</span><span class="n">BaseField</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Represent a sequence of bytes broken down into bit segments</span>
+
+<span class="sd">    Bit segments may be any BitFieldField instance, with the two most</span>
+<span class="sd">    commonly used fields being:</span>
+
+<span class="sd">    * BitBool(): A single bit flag that is either True or False</span>
+<span class="sd">    * BitNum(bits): A multi-bit field treated like a big-endian integral</span>
+<span class="sd">           value.</span>
+
+<span class="sd">    Example Usage::</span>
+
+<span class="sd">        class TCPFrameHeader(Structure):</span>
+<span class="sd">            source_address = UBInt16()</span>
+<span class="sd">            destination_address = UBInt16()</span>
+<span class="sd">            sequence_number = UBInt32()</span>
+<span class="sd">            acknowledgement_number = UBInt32()</span>
+<span class="sd">            options = BitField(16,</span>
+<span class="sd">                data_offset=BitNum(4),</span>
+<span class="sd">                reserved=BitNum(3),</span>
+<span class="sd">                NS=BitBool(),</span>
+<span class="sd">                CWR=BitBool(),</span>
+<span class="sd">                ECE=BitBool(),</span>
+<span class="sd">                URG=BitBool(),</span>
+<span class="sd">                ACK=BitBool(),</span>
+<span class="sd">                PSH=BitBool(),</span>
+<span class="sd">                RST=BitBool(),</span>
+<span class="sd">                SYN=BitBool(),</span>
+<span class="sd">                FIN=BitBool()</span>
+<span class="sd">            )</span>
+<span class="sd">            window_size = UBInt16()</span>
+<span class="sd">            checksum = UBInt16()</span>
+<span class="sd">            urgent_pointer = UBInt16()</span>
+
+<span class="sd">        tcp_packet = TCPFrameHeader()</span>
+<span class="sd">        o = tcp_packet.options</span>
+<span class="sd">        o.data_offset = 3</span>
+<span class="sd">        o.NS = True</span>
+<span class="sd">        o.CWR = False</span>
+<span class="sd">        o.</span>
+<span class="sd">        # ... so on, so forth</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">number_bits</span><span class="p">,</span> <span class="n">field</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">BaseField</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_ordered_bitfields</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_bitfield_map</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="n">number_bits</span> <span class="o">%</span> <span class="mi">8</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">SuitcaseProgrammingError</span><span class="p">(</span><span class="s">&quot;Number of bits must be a factor of &quot;</span>
+                                           <span class="s">&quot;8, was </span><span class="si">%d</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">number_bits</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">number_bits</span> <span class="o">=</span> <span class="n">number_bits</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">number_bytes</span> <span class="o">=</span> <span class="n">number_bits</span> <span class="o">//</span> <span class="mi">8</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bytes_required</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">number_bytes</span>
+        <span class="k">if</span> <span class="n">field</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">field</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="mi">1</span><span class="p">:</span> <span class="n">UBInt8</span><span class="p">,</span>
+                <span class="mi">2</span><span class="p">:</span> <span class="n">UBInt16</span><span class="p">,</span>
+                <span class="mi">3</span><span class="p">:</span> <span class="n">UBInt24</span><span class="p">,</span>
+                <span class="mi">4</span><span class="p">:</span> <span class="n">UBInt32</span><span class="p">,</span>
+                <span class="mi">5</span><span class="p">:</span> <span class="n">UBInt40</span><span class="p">,</span>
+                <span class="mi">6</span><span class="p">:</span> <span class="n">UBInt48</span><span class="p">,</span>
+                <span class="mi">7</span><span class="p">:</span> <span class="n">UBInt56</span><span class="p">,</span>
+                <span class="mi">8</span><span class="p">:</span> <span class="n">UBInt64</span><span class="p">,</span>
+            <span class="p">}[</span><span class="bp">self</span><span class="o">.</span><span class="n">number_bytes</span><span class="p">]()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_field</span> <span class="o">=</span> <span class="n">field</span><span class="o">.</span><span class="n">create_instance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="p">)</span>
+
+        <span class="n">placeholders</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">six</span><span class="o">.</span><span class="n">iteritems</span><span class="p">(</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">_BitFieldFieldPlaceholder</span><span class="p">):</span>
+                <span class="n">placeholders</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">))</span>
+
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">placeholder</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">placeholders</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">kv</span><span class="p">:</span> <span class="n">kv</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">sequence_number</span><span class="p">):</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">placeholder</span><span class="o">.</span><span class="n">create_instance</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_bitfield_map</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_ordered_bitfields</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">__getattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">__dict__</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;_bitfield_map&#39;</span><span class="p">,</span> <span class="p">{}):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_bitfield_map</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">viewget</span><span class="p">()</span>
+        <span class="k">return</span> <span class="nb">object</span><span class="o">.</span><span class="n">__getattribute__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">__dict__</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;_bitfield_map&#39;</span><span class="p">,</span> <span class="p">{}):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_bitfield_map</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">viewset</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__dict__</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">sio</span> <span class="o">=</span> <span class="n">StringIO</span><span class="p">()</span>
+        <span class="n">sio</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&quot;BitField(</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ordered_bitfields</span><span class="p">:</span>
+            <span class="n">sio</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&quot;    </span><span class="si">%s</span><span class="s">=</span><span class="si">%r</span><span class="s">,</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">field</span><span class="p">))</span>
+        <span class="n">sio</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&quot;  )&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">sio</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">getval</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="nf">setval</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">SuitcaseProgrammingError</span><span class="p">(</span><span class="s">&quot;Setting the value of a bitfield &quot;</span>
+                                       <span class="s">&quot;directly is prohibited&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">pack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">):</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">shift</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">number_bits</span>
+        <span class="k">for</span> <span class="n">_key</span><span class="p">,</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ordered_bitfields</span><span class="p">:</span>
+            <span class="n">shift</span> <span class="o">-=</span> <span class="n">field</span><span class="o">.</span><span class="n">size</span>
+            <span class="n">mask</span> <span class="o">=</span> <span class="p">(</span><span class="mi">2</span> <span class="o">**</span> <span class="n">field</span><span class="o">.</span><span class="n">size</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>  <span class="c"># mask off size bits</span>
+            <span class="n">value</span> <span class="o">|=</span> <span class="p">((</span><span class="n">field</span><span class="o">.</span><span class="n">getval</span><span class="p">()</span> <span class="o">&amp;</span> <span class="n">mask</span><span class="p">)</span> <span class="o">&lt;&lt;</span> <span class="n">shift</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_field</span><span class="o">.</span><span class="n">setval</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="n">sio</span> <span class="o">=</span> <span class="n">BytesIO</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_field</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="n">sio</span><span class="p">)</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">sio</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()[</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">number_bytes</span><span class="p">:]</span>
+        <span class="n">stream</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">unpack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_field</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_field</span><span class="o">.</span><span class="n">getval</span><span class="p">()</span>
+        <span class="n">shift</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">number_bits</span>
+        <span class="k">for</span> <span class="n">_key</span><span class="p">,</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ordered_bitfields</span><span class="p">:</span>
+            <span class="n">shift</span> <span class="o">-=</span> <span class="n">field</span><span class="o">.</span><span class="n">size</span>
+            <span class="n">mask</span> <span class="o">=</span> <span class="p">(</span><span class="mi">2</span> <span class="o">**</span> <span class="n">field</span><span class="o">.</span><span class="n">size</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="n">fval</span> <span class="o">=</span> <span class="p">(</span><span class="n">value</span> <span class="o">&gt;&gt;</span> <span class="n">shift</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">mask</span>
+            <span class="n">field</span><span class="o">.</span><span class="n">setval</span><span class="p">(</span><span class="n">fval</span><span class="p">)</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">suitcase</a></h1>
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+</ul>
+
+
+<hr />
+<ul>
+    
+    <li class="toctree-l1"><a href="http://www.digi.com/wireless-design-services/">Digi WDS</a></li>
+    
+    <li class="toctree-l1"><a href="https://github.com/digidotcom/python-suitcase">Suitcase on Github</a></li>
+    
+</ul>
+
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2015, Digi International, Inc..
+      
+    </div>
+
+    
+    <a href="https://github.com/digidotcom/python-suitcase" class="github">
+        <img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub"  class="github"/>
+    </a>
+    
+
+    
+  </body>
+</html>
