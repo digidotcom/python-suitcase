@@ -8,7 +8,8 @@ import sys
 import six
 from suitcase.exceptions import SuitcaseException, \
     SuitcasePackException, SuitcaseParseError
-from suitcase.fields import FieldPlaceholder, CRCField, SubstructureField
+from suitcase.fields import FieldPlaceholder, CRCField, SubstructureField, \
+    ConditionalField
 from six import BytesIO
 
 
@@ -85,6 +86,11 @@ class Packer(object):
         logic present for dealing with checksum fields.
 
         """
+        def is_substructure(field):
+            return isinstance(field, SubstructureField) or \
+                    isinstance(field, ConditionalField) and \
+                    isinstance(field.field, SubstructureField)
+
         crc_fields = []
         greedy_field = None
         # go through the fields from first to last.  If we hit a greedy
@@ -93,11 +99,15 @@ class Packer(object):
             if isinstance(field, CRCField):
                 crc_fields.append((field, stream.tell()))
             length = field.bytes_required
-            if isinstance(field, SubstructureField):
+            if is_substructure(field):
                 remaining_data = stream.getvalue()[stream.tell():]
                 returned_stream = field.unpack(remaining_data, trailing=True)
+                if returned_stream is not None:
+                    consumed = returned_stream.tell()
+                else:
+                    consumed = 0
                 # We need to fast forward by as much as was consumed by the structure
-                stream.seek(stream.tell() + returned_stream.tell())
+                stream.seek(stream.tell() + consumed)
                 continue
             elif length is None:
                 greedy_field = field
@@ -135,7 +145,7 @@ class Packer(object):
                     raise SuitcaseParseError("While attempting to parse field "
                                              "%r we tried to read %s bytes but "
                                              "we were only able to read %s." %
-                                             (name, length, len(data)))
+                                             (_name, length, len(data)))
                 try:
                     field.unpack(data)
                 except SuitcaseException:

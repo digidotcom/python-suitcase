@@ -612,9 +612,9 @@ class ConditionalField(BaseField):
         if self.condition(self._parent):
             self.field.pack(stream)
 
-    def unpack(self, data):
+    def unpack(self, data, **kwargs):
         if self.condition(self._parent):
-            self.field.unpack(data)
+            return self.field.unpack(data, **kwargs)
 
     def getval(self):
         return self.field.getval()
