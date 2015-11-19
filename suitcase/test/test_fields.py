@@ -1036,6 +1036,13 @@ class BasicMessageArray(Structure):
     array = FieldArray(BasicMessage, count)
 
 
+# Test empty FieldArray with content after the array
+class BasicMessageArrayAfter(Structure):
+    count = LengthField(UBInt8(), multiplier=2)
+    array = FieldArray(BasicMessage, count)
+    after = UBInt8()
+
+
 class TestFieldArray(unittest.TestCase):
     def test_pack_valid(self):
         m = BasicMessageArray()
@@ -1070,6 +1077,40 @@ class TestFieldArray(unittest.TestCase):
         m = BasicMessageArray.from_data(b"\x00")
         self.assertEqual(m.count, 0)
         self.assertEqual(len(m.array), 0)
+
+    def test_pack_after_valid(self):
+        m = BasicMessageArrayAfter()
+
+        m.array = []
+        m.after = 1
+
+        self.assertEqual(m.pack(), b"\x00\x01")
+
+        # Populate the array.
+        m2 = BasicMessageArrayAfter()
+        first = BasicMessage()
+        first.b1 = 0x22
+        first.b2 = 0x33
+        m2.array = [first]
+        m2.after = 0
+
+        self.assertEquals(m2.pack(), b"\x01\x22\x33\x00")
+
+    def test_unpack_after_valid(self):
+        m = BasicMessageArrayAfter.from_data(b"\x00\x11")
+
+        self.assertEqual(m.count, 0)
+        self.assertEqual(len(m.array), 0)
+        self.assertEqual(m.after, 0x11)
+
+        m2 = BasicMessageArrayAfter.from_data(b"\x01\x11\x22\x00")
+
+        self.assertEqual(m2.count, 1)
+        self.assertEqual(len(m2.array), 1)
+        self.assertIsInstance(m2.array[0], BasicMessage)
+        self.assertEqual(m2.array[0].b1, 0x11)
+        self.assertEqual(m2.array[0].b2, 0x22)
+        self.assertEqual(m2.after, 0)
 
 
 # Test SubstructureField
