@@ -885,6 +885,11 @@ class FieldArray(BaseField):
             stream.write(structure.pack())
 
     def unpack(self, data, **kwargs):
+        length = self.bytes_required
+        if length == 0 or (data == b"" and length is None):
+            # Array is empty.
+            return
+
         kwargs['trailing'] = True
         while True:
             structure = self.substructure()

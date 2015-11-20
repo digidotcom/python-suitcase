@@ -1030,6 +1030,48 @@ class TestTypeField(unittest.TestCase):
         self.assertRaises(SuitcaseProgrammingError, m.pack)
 
 
+# Test empty FieldArray
+class BasicMessageArray(Structure):
+    count = LengthField(UBInt8(), multiplier=2)
+    array = FieldArray(BasicMessage, count)
+
+
+class TestFieldArray(unittest.TestCase):
+    def test_pack_valid(self):
+        m = BasicMessageArray()
+
+        first = BasicMessage()
+        first.b1 = 0x11
+        first.b2 = 0x22
+        second = BasicMessage()
+        second.b1 = 0x33
+        second.b2 = 0x44
+
+        m.array = [first, second]
+
+        self.assertEqual(m.pack(), b"\x02\x11\x22\x33\x44")
+
+    def test_unpack_valid(self):
+        m = BasicMessageArray.from_data(b"\x01AB")
+        self.assertEqual(m.count, 1)
+        self.assertEqual(len(m.array), 1)
+        self.assertIsInstance(m.array[0], BasicMessage)
+        self.assertEqual(m.array[0].b1, ord('A'))
+        self.assertEqual(m.array[0].b2, ord('B'))
+
+    def test_pack_empty(self):
+        m = BasicMessageArray()
+
+        m.array = []
+
+        self.assertEqual(m.pack(), b"\x00")
+
+    def test_unpack_empty(self):
+        m = BasicMessageArray.from_data(b"\x00")
+        self.assertEqual(m.count, 0)
+        self.assertEqual(len(m.array), 0)
+
+
 # Test SubstructureField
 class PascalString16(Structure):
     length = LengthField(UBInt16())
