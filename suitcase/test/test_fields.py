@@ -668,6 +668,14 @@ class ConditionalDispatch(Structure):
             condition=lambda m: m.f2 == 255)
 
 
+class ConditionalSubstructures(Structure):
+    f1 = UBInt8()
+    f2 = ConditionalField(SubstructureField(BasicMessage),
+                          condition=lambda m: m.f1 < 10)
+    f3 = ConditionalField(SubstructureField(BasicMessage),
+                          condition=lambda m: m.f1 < 20)
+
+
 class TestConditionalField(unittest.TestCase):
     def test_conditional_pack(self):
         m1 = Conditional()
@@ -731,6 +739,62 @@ class TestConditionalField(unittest.TestCase):
         self.assertIsInstance(m2.f3, BasicMessage)
         self.assertEqual(m2.f3.b1, 0x11)
         self.assertEqual(m2.f3.b2, 0x22)
+
+    def test_conditional_substructure_pack(self):
+        m = ConditionalSubstructures()
+        m.f1 = 9
+
+        f2 = BasicMessage()
+        f2.b1 = 0x55
+        f2.b2 = 0x66
+        m.f2 = f2
+
+        f3 = BasicMessage()
+        f3.b1 = 0x77
+        f3.b2 = 0x88
+        m.f3 = f3
+
+        self.assertEqual(m.pack(), b"\x09\x55\x66\x77\x88")
+
+        # Remove f2
+        m.f1 = 10
+        m.f2 = None
+        self.assertEqual(m.pack(), b"\x0a\x77\x88")
+
+        # Remove f3
+        m.f1 = 20
+        m.f3 = None
+        self.assertEqual(m.pack(), b"\x14")
+
+    def test_conditional_substructure_unpack(self):
+        # Neither substructure is present
+        m1 = ConditionalSubstructures.from_data(b"\x20")
+        self.assertEqual(m1.f1, 0x20)
+        self.assertEqual(m1.f2, None)
+        self.assertEqual(m1.f3, None)
+
+        # Include f3 but not f2
+        m2 = ConditionalSubstructures()
+        m2.unpack(b"\x10" +
+                  b"\x11\x22")
+        self.assertEqual(m2.f1, 0x10)
+        self.assertEqual(m2.f2, None)
+        self.assertIsInstance(m2.f3, BasicMessage)
+        self.assertEqual(m2.f3.b1, 0x11)
+        self.assertEqual(m2.f3.b2, 0x22)
+
+        # Include both substructures
+        m3 = ConditionalSubstructures()
+        m3.unpack(b"\x00" +
+                  b"\x11\x22" +
+                  b"\x33\x44")
+        self.assertEqual(m3.f1, 0x00)
+        self.assertIsInstance(m3.f2, BasicMessage)
+        self.assertEqual(m3.f2.b1, 0x11)
+        self.assertEqual(m3.f2.b2, 0x22)
+        self.assertIsInstance(m3.f3, BasicMessage)
+        self.assertEqual(m3.f3.b1, 0x33)
+        self.assertEqual(m3.f3.b2, 0x44)
 
 
 class TestStructure(unittest.TestCase):

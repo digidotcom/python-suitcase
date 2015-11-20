@@ -617,6 +617,9 @@ class ConditionalField(BaseField):
             return self.field.unpack(data, **kwargs)
 
     def getval(self):
+        if not self.condition(self._parent):
+            return None
+
         return self.field.getval()
 
     def setval(self, value):
