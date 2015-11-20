@@ -82,6 +82,10 @@ class BaseField(object):
     def __repr__(self):
         return repr(self.getval())
 
+    def is_substructure(self):
+        """Return True if this field is (effectively) a SubstructureField"""
+        return False
+
     def getval(self):
         return self._value
 
@@ -175,8 +179,8 @@ class CRCField(BaseField):
         # write placeholder during the first pass
         stream.write(b'\x00' * self.field.bytes_required)
 
-    def unpack(self, data):
-        self.field.unpack(data)
+    def unpack(self, data, **kwargs):
+        self.field.unpack(data, **kwargs)
 
 
 class Magic(BaseField):
@@ -196,7 +200,7 @@ class Magic(BaseField):
     def pack(self, stream):
         stream.write(self.expected_sequence)
 
-    def unpack(self, data):
+    def unpack(self, data, **kwargs):
         if not data == self.expected_sequence:
             raise SuitcaseParseError(
                 "Expected sequence %r for magic field but got %r on "
@@ -270,7 +274,7 @@ class FieldProperty(BaseField):
 
         self.field.setval(onset(value))
 
-    def unpack(self, data):
+    def unpack(self, data, **kwargs):
         pass
 
     def pack(self, stream):
@@ -317,7 +321,7 @@ class DispatchField(BaseField):
     def pack(self, stream):
         return self.field.pack(stream)
 
-    def unpack(self, data):
+    def unpack(self, data, **kwargs):
         assert len(data) == self.bytes_required
         return self.field.unpack(data)
 
@@ -392,7 +396,7 @@ class DispatchTarget(BaseField):
     def pack(self, stream):
         return self._value._packer.write(stream)
 
-    def unpack(self, data):
+    def unpack(self, data, **kwargs):
         target_msg_type = self._lookup_msg_type()
         if target_msg_type is None:
             target_msg_type = self.dispatch_mapping.get(None)
@@ -446,6 +450,9 @@ class LengthField(BaseField):
     def _default_set_length(self, field, length):
         field._value = length  # TODO: use setval() [problem with DependentField tests]?
 
+    def is_substructure(self):
+        return self.length_field.is_substructure()
+
     @property
     def bytes_required(self):
         return self.length_field.bytes_required
@@ -474,9 +481,9 @@ class LengthField(BaseField):
         self.set_length(self.length_field, self.length_value_provider())
         self.length_field.pack(stream)
 
-    def unpack(self, data):
+    def unpack(self, data, **kwargs):
         assert len(data) == self.bytes_required
-        return self.length_field.unpack(data)
+        return self.length_field.unpack(data, **kwargs)
 
     def get_adjusted_length(self):
         return self.get_length(self.length_field) * self.multiplier
@@ -532,6 +539,9 @@ class TypeField(BaseField):
     def __repr__(self):
         return repr(self.type_field)
 
+    def is_substructure(self):
+        return self.type_field.is_substructure()
+
     @property
     def bytes_required(self):
         return self.type_field.bytes_required
@@ -563,9 +573,9 @@ class TypeField(BaseField):
 
         self.type_field.pack(stream)
 
-    def unpack(self, data):
+    def unpack(self, data, **kwargs):
         assert len(data) == self.bytes_required
-        return self.type_field.unpack(data)
+        return self.type_field.unpack(data, **kwargs)
 
     def get_adjusted_length(self):
         return self._lookup_msg_length()
@@ -600,6 +610,9 @@ class ConditionalField(BaseField):
             return repr(self.field)
         else:
             return "<ConditionalField: not included>"
+
+    def is_substructure(self):
+        return self.field.is_substructure()
 
     @property
     def bytes_required(self):
@@ -666,7 +679,7 @@ class Payload(BaseField):
     def pack(self, stream):
         stream.write(self._value)
 
-    def unpack(self, data):
+    def unpack(self, data, **kwargs):
         self._value = data
 
 
@@ -693,7 +706,7 @@ class BaseVariableByteSequence(BaseField):
         except struct.error as e:
             raise SuitcasePackStructException(e)
 
-    def unpack(self, data):
+    def unpack(self, data, **kwargs):
         assert len(data) == self.bytes_required
 
         length = self.bytes_required
@@ -752,7 +765,7 @@ class DependentField(BaseField):
     def pack(self, stream):
         pass
 
-    def unpack(self, data):
+    def unpack(self, data, **kwargs):
         pass
 
     def getval(self):
@@ -803,6 +816,9 @@ class SubstructureField(BaseField):
         self.substructure = substructure
         self._value = substructure()
 
+    def is_substructure(self):
+        return True
+
     @property
     def bytes_required(self):
         # We return None but do not count as a greedy field to the packer
@@ -811,9 +827,9 @@ class SubstructureField(BaseField):
     def pack(self, stream):
         stream.write(self._value.pack())
 
-    def unpack(self, data, trailing):
+    def unpack(self, data, **kwargs):
         self._value = self.substructure()
-        return self._value.unpack(data, trailing)
+        return self._value.unpack(data, **kwargs)
 
 
 class FieldArray(BaseField):
@@ -868,10 +884,11 @@ class FieldArray(BaseField):
         for structure in self._value:
             stream.write(structure.pack())
 
-    def unpack(self, data):
+    def unpack(self, data, **kwargs):
+        kwargs['trailing'] = True
         while True:
             structure = self.substructure()
-            data = structure.unpack(data, trailing=True).read()
+            data = structure.unpack(data, **kwargs).read()
             self._value.append(structure)
             if data == b"":
                 break
@@ -891,7 +908,7 @@ class BaseFixedByteSequence(BaseField):
         except struct.error as e:
             raise SuitcasePackStructException(e)
 
-    def unpack(self, data):
+    def unpack(self, data, **kwargs):
         try:
             self._value = struct.unpack(self.format, data)
         except struct.error as e:
@@ -950,7 +967,7 @@ class BaseStructField(BaseField):
             raise SuitcasePackStructException(e)
         stream.write(to_write)
 
-    def unpack(self, data):
+    def unpack(self, data, **kwargs):
         value = 0
         if self.UNPACK_FORMAT[0] == b">"[0]:  # The element access makes this compatible with Python 2 and 3
             for i, byte in enumerate(reversed(struct.unpack(self.UNPACK_FORMAT, data))):
@@ -1366,8 +1383,8 @@ class BitField(BaseField):
         out = sio.getvalue()[-self.number_bytes:]
         stream.write(out)
 
-    def unpack(self, data):
-        self._field.unpack(data)
+    def unpack(self, data, **kwargs):
+        self._field.unpack(data, **kwargs)
         value = self._field.getval()
         shift = self.number_bits
         for _key, field in self._ordered_bitfields:

@@ -86,11 +86,6 @@ class Packer(object):
         logic present for dealing with checksum fields.
 
         """
-        def is_substructure(field):
-            return isinstance(field, SubstructureField) or \
-                    isinstance(field, ConditionalField) and \
-                    isinstance(field.field, SubstructureField)
-
         crc_fields = []
         greedy_field = None
         # go through the fields from first to last.  If we hit a greedy
@@ -99,7 +94,7 @@ class Packer(object):
             if isinstance(field, CRCField):
                 crc_fields.append((field, stream.tell()))
             length = field.bytes_required
-            if is_substructure(field):
+            if field.is_substructure():
                 remaining_data = stream.getvalue()[stream.tell():]
                 returned_stream = field.unpack(remaining_data, trailing=True)
                 if returned_stream is not None:
