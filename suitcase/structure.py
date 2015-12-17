@@ -45,8 +45,10 @@ class Packer(object):
             except Exception:
                 # keep the original traceback information, see
                 # http://stackoverflow.com/questions/3847503/wrapping-exceptions-in-python
-                exc_value = SuitcasePackException("Unexpected exception during pack of %r" % name)
-                six.reraise(type(exc_value), exc_value, sys.exc_info()[2])
+                exc_type = SuitcasePackException
+                _, exc_value, exc_traceback = sys.exc_info()
+                exc_value = exc_type("Unexpected exception during pack of %r: %s" % (name, str(exc_value)))
+                six.reraise(exc_type, exc_value, exc_traceback)
 
         # if there is a crc value, seek back to the field and
         # pack it with the right value
@@ -120,8 +122,10 @@ class Packer(object):
             except SuitcaseException:
                 raise  # just re-raise these
             except Exception:
-                exc_value = SuitcaseParseError("Unexpected exception while unpacking field %r" % name)
-                six.reraise(type(exc_value), exc_value, sys.exc_info()[2])
+                exc_type = SuitcaseParseError
+                _, exc_value, exc_traceback = sys.exc_info()
+                exc_value = exc_type("Unexpected exception while unpacking field %r: %s" % (name, str(exc_value)))
+                six.reraise(exc_type, exc_value, exc_traceback)
 
         if greedy_field is not None:
             remaining_data = stream.read()
@@ -146,8 +150,10 @@ class Packer(object):
                 except SuitcaseException:
                     raise  # just re-raise these
                 except Exception:
-                    exc_value = SuitcaseParseError("Unexpected exception while unpacking field %r" % name)
-                    six.reraise(type(exc_value), exc_value, sys.exc_info()[2])
+                    exc_type = SuitcaseParseError
+                    _, exc_value, exc_traceback = sys.exc_info()
+                    exc_value = exc_type("Unexpected exception while unpacking field %r: %s" % (name, str(exc_value)))
+                    six.reraise(exc_type, exc_value, exc_traceback)
 
             greedy_data_chunk = inverted_stream.read()[::-1]
             greedy_field.unpack(greedy_data_chunk)
