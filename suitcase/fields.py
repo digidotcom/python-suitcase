@@ -845,6 +845,8 @@ class FieldArray(BaseField):
         the entire contents of the array.
     :param length_provider: The field providing a length value binding this
         message (if any).  Set this field to None to leave unconstrained.
+    :param num_elements_provider: The field providing the number of elements
+        in the array. Set this field to None to leave unconstrained.
 
     For example, one can imagine a message listing the zipcodes covered by
     a telephone area code. Depending on the population density, the number
@@ -863,7 +865,7 @@ class FieldArray(BaseField):
 
     """
 
-    def __init__(self, substructure, length_provider=None, **kwargs):
+    def __init__(self, substructure, length_provider=None, num_elements_provider=None, **kwargs):
         BaseField.__init__(self, **kwargs)
         self.substructure = substructure
         self._value = list()
@@ -872,6 +874,12 @@ class FieldArray(BaseField):
             self.length_provider.associate_length_consumer(self)
         else:
             self.length_provider = None
+        if isinstance(num_elements_provider, FieldPlaceholder):
+            self.num_elements_provider = self._ph2f(num_elements_provider)
+            self.num_elements_provider.length_value_provider = lambda: len(self._value)
+        else:
+            self.num_elements_provider = None
+
 
     @property
     def bytes_required(self):
@@ -880,15 +888,22 @@ class FieldArray(BaseField):
         else:
             return self.length_provider.get_adjusted_length()
 
+    @property
+    def num_elements(self):
+        if self.num_elements_provider is None:
+            return None
+        else:
+            return self.num_elements_provider.get_adjusted_length()
+
     def pack(self, stream):
         for structure in self._value:
             stream.write(structure.pack())
 
     def unpack(self, data, **kwargs):
         length = self.bytes_required
-        if length == 0 or (data == b"" and length is None):
+        if length == 0 or (data == b"" and length is None) or self.num_elements == 0:
             # Array is empty.
-            return
+            return data
 
         kwargs['trailing'] = True
         while True:
@@ -897,6 +912,14 @@ class FieldArray(BaseField):
             self._value.append(structure)
             if data == b"":
                 break
+            if len(self._value) == self.num_elements:
+                break
+
+        if self.num_elements is not None and len(self._value) != self.num_elements:
+            raise SuitcaseParseError("Expected %r elements but received %r." %
+                                     (self.num_elements, len(self._value)))
+
+        return data
 
 
 class BaseFixedByteSequence(BaseField):
