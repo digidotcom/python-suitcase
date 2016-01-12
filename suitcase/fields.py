@@ -916,7 +916,7 @@ class FieldArray(BaseField):
                 break
 
         if self.num_elements is not None and len(self._value) != self.num_elements:
-            raise SuitcaseParseError("Expected %r elements but received %r." %
+            raise SuitcaseParseError("Expected %s elements but received %d." %
                                      (self.num_elements, len(self._value)))
 
         return data
