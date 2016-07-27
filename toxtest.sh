@@ -9,9 +9,9 @@
 pyversions=(2.7.10
             3.3.5
             3.4.3
-            3.5.0
-            pypy-4.0.0
-            pypy3-2.4.0)
+            3.5.2
+            pypy-5.3.1
+            pypy3-5.2)
 
 # parse options
 for i in "$@"
