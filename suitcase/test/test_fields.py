@@ -1043,6 +1043,12 @@ class BasicMessageArrayAfter(Structure):
     after = UBInt8()
 
 
+# Test a FieldArray that takes a number of elements instead of a size in bytes.
+class BasicMessageArrayNumElements(Structure):
+    count = LengthField(UBInt8())
+    array = FieldArray(BasicMessage, num_elements_provider=count)
+
+
 class TestFieldArray(unittest.TestCase):
     def test_pack_valid(self):
         m = BasicMessageArray()
@@ -1111,6 +1117,30 @@ class TestFieldArray(unittest.TestCase):
         self.assertEqual(m2.array[0].b1, 0x11)
         self.assertEqual(m2.array[0].b2, 0x22)
         self.assertEqual(m2.after, 0)
+
+    def test_pack_num_elements_valid(self):
+        m = BasicMessageArrayNumElements()
+        m.array = []
+        self.assertEqual(m.pack(), b"\x00")
+
+        messages = [BasicMessage(), BasicMessage(), BasicMessage()]
+        for i, message in enumerate(messages):
+            message.b1 = 0x10 + i
+            message.b2 = 0x20 + i
+            m.array.append(message)
+
+        self.assertEqual(m.pack(), b"\x03\x10\x20\x11\x21\x12\x22")
+
+    def test_unpack_num_elements_valid(self):
+        m = BasicMessageArrayNumElements.from_data(b"\x02\x22\x33\x44\x55")
+
+        self.assertEqual(m.count, 2)
+        self.assertEqual(len(m.array), 2)
+        self.assertIsInstance(m.array[0], BasicMessage)
+        self.assertEqual(m.array[0].b1, 0x22)
+        self.assertEqual(m.array[0].b2, 0x33)
+        self.assertEqual(m.array[1].b1, 0x44)
+        self.assertEqual(m.array[1].b2, 0x55)
 
 
 # Test SubstructureField

@@ -4,11 +4,11 @@
 #
 # Copyright (c) 2015 Digi International Inc. All Rights Reserved.
 import sys
-
+import os
 import six
 from suitcase.exceptions import SuitcaseException, \
     SuitcasePackException, SuitcaseParseError
-from suitcase.fields import FieldPlaceholder, CRCField, SubstructureField, \
+from suitcase.fields import FieldArray, FieldPlaceholder, CRCField, SubstructureField, \
     ConditionalField
 from six import BytesIO
 
@@ -107,8 +107,12 @@ class Packer(object):
                 stream.seek(stream.tell() + consumed)
                 continue
             elif length is None:
-                greedy_field = field
-                break
+                if isinstance(field, FieldArray) and field.num_elements is not None:
+                    # Read the data greedily now, and we'll backtrack after enough elements have been read.
+                    data = stream.read()
+                else:
+                    greedy_field = field
+                    break
             else:
                 data = stream.read(length)
                 if len(data) != length:
@@ -118,7 +122,8 @@ class Packer(object):
                                              (name, length, len(data)))
 
             try:
-                field.unpack(data)
+                unused_data = field.unpack(data)
+                stream.seek(-len(unused_data or ""), os.SEEK_CUR)
             except SuitcaseException:
                 raise  # just re-raise these
             except Exception:
