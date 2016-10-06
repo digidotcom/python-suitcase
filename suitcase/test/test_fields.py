@@ -1198,5 +1198,21 @@ class TestDiscoverableFields(unittest.TestCase):
         self.assertTrue("value" in attrs)
 
 
+class TestKeywordArgumentInitialization(unittest.TestCase):
+    def test_basic_assignment(self):
+        m = PascalString16(value=b"Hello World!")
+        self.assertEqual(m.pack(), b"\x00\x0cHello World!")
+
+    def test_nested_assignment(self):
+        m = NameStructure(first=PascalString16(value=b"John"),
+                          last=PascalString16(value=b"Doe"))
+        self.assertEqual(m.pack(), b"\x00\x04John\x00\x03Doe")
+
+    def test_partial_assignment(self):
+        m = NameStructure(first=PascalString16(value=b"John"))
+        m.last = PascalString16(value=b"Doe")
+        self.assertEqual(m.pack(), b"\x00\x04John\x00\x03Doe")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -242,6 +242,26 @@ class Structure(object):
           data=...'Hello, world!',
         )
 
+    Initialization via keyword argument is also supported::
+
+        >>> dgram = UDPDatagram(source_port=9110,
+        ...                     destination_port=1001,
+        ...                     checksum=27193,
+        ...                     data=b"Hello, world!")
+        ...
+        >>> printb(dgram.pack())
+        '#\x96\x03\xe9\x00\rj9Hello, world!'
+        >>> dgram2 = UDPDatagram()
+        >>> dgram2.unpack(dgram.pack())
+        >>> dgram2
+        UDPDatagram (
+          source_port=9110,
+          destination_port=1001,
+          length=13,
+          checksum=27193,
+          data=...'Hello, world!',
+        )
+
     """
 
     @classmethod
