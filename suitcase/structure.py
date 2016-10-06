@@ -263,7 +263,7 @@ class Structure(object):
         m.unpack(data)
         return m
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         self._key_to_field = {}
         self._parent = None
         self._sorted_fields = []
@@ -278,6 +278,8 @@ class Structure(object):
             self._placeholder_to_field[field_placeholder] = field
             self._sorted_fields.append((key, field))
         self._packer = Packer(self._sorted_fields, self._crc_field)
+        for key, value in kwargs.items():
+            self.__setattr__(key, value)
 
     def __getattr__(self, key):
         k2f = self.__dict__.get('_key_to_field', {})
