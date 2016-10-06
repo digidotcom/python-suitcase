@@ -293,6 +293,9 @@ class Structure(object):
             return field.setval(value)
         return object.__setattr__(self, key, value)
 
+    def __dir__(self):
+        return object.__dir__(self) + [str(k) for k, v in self._sorted_fields]
+
     def __iter__(self):
         return iter(self._sorted_fields)
 
