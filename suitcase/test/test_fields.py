@@ -1189,5 +1189,14 @@ class TestSubstructureField(unittest.TestCase):
         self.assertEqual(m.last.value, b"Doe")
         self.assertEqual(m.greedy, b"Hello World!")
 
+
+class TestDiscoverableFields(unittest.TestCase):
+    def test_dir(self):
+        m = PascalString16()
+        attrs = dir(m)
+        self.assertTrue("length" in attrs)
+        self.assertTrue("value" in attrs)
+
+
 if __name__ == "__main__":
     unittest.main()
