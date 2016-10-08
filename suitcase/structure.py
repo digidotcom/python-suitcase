@@ -299,7 +299,7 @@ class Structure(object):
             self._sorted_fields.append((key, field))
         self._packer = Packer(self._sorted_fields, self._crc_field)
         for key, value in kwargs.items():
-            self.__setattr__(key, value)
+            setattr(self, key, value)
 
     def __getattr__(self, key):
         k2f = self.__dict__.get('_key_to_field', {})
