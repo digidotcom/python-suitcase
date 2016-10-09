@@ -242,6 +242,26 @@ class Structure(object):
           data=...'Hello, world!',
         )
 
+    Initialization via keyword argument is also supported::
+
+        >>> dgram = UDPDatagram(source_port=9110,
+        ...                     destination_port=1001,
+        ...                     checksum=27193,
+        ...                     data=b"Hello, world!")
+        ...
+        >>> printb(dgram.pack())
+        '#\x96\x03\xe9\x00\rj9Hello, world!'
+        >>> dgram2 = UDPDatagram()
+        >>> dgram2.unpack(dgram.pack())
+        >>> dgram2
+        UDPDatagram (
+          source_port=9110,
+          destination_port=1001,
+          length=13,
+          checksum=27193,
+          data=...'Hello, world!',
+        )
+
     """
 
     @classmethod
@@ -263,7 +283,7 @@ class Structure(object):
         m.unpack(data)
         return m
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         self._key_to_field = {}
         self._parent = None
         self._sorted_fields = []
@@ -278,6 +298,8 @@ class Structure(object):
             self._placeholder_to_field[field_placeholder] = field
             self._sorted_fields.append((key, field))
         self._packer = Packer(self._sorted_fields, self._crc_field)
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
     def __getattr__(self, key):
         k2f = self.__dict__.get('_key_to_field', {})
