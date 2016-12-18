@@ -1057,6 +1057,15 @@ class UBInt64(BaseStructField):
     PACK_FORMAT = UNPACK_FORMAT = b">Q"
 
 
+class UBFloat32(BaseStructField):
+    """Unsigned Big Endian 32-bit float field"""
+    PACK_FORMAT = UNPACK_FORMAT = b">f"
+
+
+class UBFloat64(BaseStructField):
+    """Unsigned Big Endian 64-bit float field"""
+    PACK_FORMAT = UNPACK_FORMAT = b">d"
+
 # ==============================================================================
 # Signed Big Endian
 # ==============================================================================
@@ -1157,6 +1166,16 @@ class ULInt56(BaseStructField):
 class ULInt64(BaseStructField):
     """Unsigned Little Endian 64-bit integer field"""
     PACK_FORMAT = UNPACK_FORMAT = b"<Q"
+
+
+class ULFloat32(BaseStructField):
+    """Unsigned Little Endian 32-bit float field"""
+    PACK_FORMAT = UNPACK_FORMAT = b"<f"
+
+
+class ULFloat64(BaseStructField):
+    """Unsigned Little Endian 64-bit float field"""
+    PACK_FORMAT = UNPACK_FORMAT = b"<d"
 
 
 # ==============================================================================
