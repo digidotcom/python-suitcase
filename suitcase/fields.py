@@ -1108,6 +1108,16 @@ class SBInt64(BaseStructField):
     PACK_FORMAT = UNPACK_FORMAT = b">q"
 
 
+class SBFloat32(BaseStructField):
+    """Unsigned Big Endian 32-bit float field"""
+    PACK_FORMAT = UNPACK_FORMAT = b">f"
+
+
+class SBFloat64(BaseStructField):
+    """Unsigned Big Endian 64-bit float field"""
+    PACK_FORMAT = UNPACK_FORMAT = b">d"
+
+
 # ==============================================================================
 # Unsigned Little Endian
 # ==============================================================================
@@ -1208,6 +1218,16 @@ class SLInt56(BaseStructField):
 class SLInt64(BaseStructField):
     """Signed Little Endian 64-bit integer field"""
     PACK_FORMAT = UNPACK_FORMAT = b"<q"
+
+    
+class SLFloat32(BaseStructField):
+    """Unsigned Little Endian 32-bit float field"""
+    PACK_FORMAT = UNPACK_FORMAT = b"<f"
+
+
+class SLFloat64(BaseStructField):
+    """Unsigned Little Endian 64-bit float field"""
+    PACK_FORMAT = UNPACK_FORMAT = b"<d"
 
 
 # ==============================================================================
