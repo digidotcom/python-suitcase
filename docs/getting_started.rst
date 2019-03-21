@@ -16,9 +16,8 @@ by Suitcase.
 The library is tested to work on the following python versions:
 
 * Python 2.7
-* Python 3.2
-* Python 3.3
-* Python 3.4
+* Python 3.5
+* Python 3.7
 
 Data Modeling
 -------------
