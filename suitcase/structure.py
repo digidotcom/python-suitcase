@@ -9,7 +9,7 @@ import six
 from suitcase.exceptions import SuitcaseException, \
     SuitcasePackException, SuitcaseParseError
 from suitcase.fields import FieldArray, FieldPlaceholder, CRCField, SubstructureField, \
-    ConditionalField
+    ConditionalField, FieldAccessor, FieldProperty
 from six import BytesIO
 
 
@@ -186,6 +186,15 @@ class StructureMeta(type):
         dct['_crc_field'] = None
         for key, value in list(dct.items()):  # use a copy, we mutate dct
             if isinstance(value, FieldPlaceholder):
+                if issubclass(value.cls, FieldAccessor):
+                    # Wrap the accessor in a simple FieldProperty,
+                    # so that the following usage model is supported:
+                    #
+                    #     class S(Structure):
+                    #         bits = BitField(...)
+                    #         segment = bits.segment
+                    value = FieldProperty(value)
+
                 dct['_field_placeholders'][key] = value
                 dct['__%s' % key] = value
                 del dct[key]

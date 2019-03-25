@@ -1214,5 +1214,100 @@ class TestKeywordArgumentInitialization(unittest.TestCase):
         self.assertEqual(m.pack(), b"\x00\x04John\x00\x03Doe")
 
 
+class StructureWithFieldAccessorAtTopLevel(Structure):
+    bits = BitField(8, top=BitNum(3), bottom=BitNum(5))
+    top = bits.top
+
+
+class TestFieldAccessorAtTopLevel(unittest.TestCase):
+    def test_access(self):
+        s = StructureWithFieldAccessorAtTopLevel.from_data(b'\xA0')
+        # Sanity check.
+        self.assertEqual(s.bits.top, 0b101)
+        self.assertEqual(s.bits.bottom, 0b00000)
+        self.assertEqual(s.top, 0b101)
+
+    def test_assignment(self):
+        s = StructureWithFieldAccessorAtTopLevel.from_data(b'\x00')
+        s.top = 0b111
+        self.assertEqual(s.pack(), b'\xE0')
+
+
+class Zero(Structure):
+    body = Payload()
+
+
+class One(Structure):
+    first = UBInt8()
+    second = UBInt16()
+
+
+class FieldAccessorDispatch(Structure):
+    bits = BitField(8, upper=BitNum(5), lower=BitNum(3))
+    body = DispatchTarget(None, bits.upper, {
+        0: Zero,
+        1: One,
+    })
+
+
+class TestFieldAccessorDispatch(unittest.TestCase):
+    def test_on_unpack(self):
+        z = FieldAccessorDispatch.from_data(b'\x07Hello')
+        self.assert_(isinstance(z.body, Zero))
+        self.assertEqual(z.body.body, b'Hello')
+
+        o = FieldAccessorDispatch.from_data(b'\x08\x11\x22\x33')
+        self.assert_(isinstance(o.body, One))
+        self.assertEqual(o.body.first, 0x11)
+        self.assertEqual(o.body.second, 0x2233)
+
+    def test_assignment(self):
+        zero = FieldAccessorDispatch.from_data(b'\x00Hello there')
+        self.assertEqual(zero.pack(), b'\x00Hello there')
+
+        zero.body = One(first=1, second=2)
+        self.assertEqual(zero.pack(), b'\x08\x01\x00\x02')
+
+
+class FieldAccessorMultiple(Structure):
+    # FieldAccessors can be referenced multiple times,
+    # and more than one attribute of a given field may be referenced.
+    # TODO: Figure out how to support LengthField(bits.upper)?
+    bits = BitField(8, upper=BitNum(4), lower=BitNum(4))
+    upper = bits.upper
+    lower = bits.lower
+    body = DispatchTarget(None, bits.lower, {
+        0b1010: Structure16,  # 0x0A
+        0b0101: One,  # 0x05
+    })
+
+
+class TestFieldAccessorMultiple(unittest.TestCase):
+    def test_unpack(self):
+        s = FieldAccessorMultiple.from_data(b'\x5A\xEE\x00')
+        self.assert_(isinstance(s.body, Structure16))
+        self.assertEqual(s.body.value, 0xEE00)
+
+        s2 = FieldAccessorMultiple.from_data(
+                b'\x35\xFF\x00\x01')
+        self.assert_(isinstance(s2.body, One))
+        self.assertEqual(s2.body.first, 0xFF)
+        self.assertEqual(s2.body.second, 0x0001)
+
+    def test_assignment(self):
+        s = FieldAccessorMultiple(body=One(first=2, second=3))
+        self.assertEqual(s.lower, 0b0101)
+        self.assertEqual(s.body.first, 2)
+        self.assertEqual(s.body.second, 3)
+        self.assertEqual(s.pack(), b'\x05\x02\x00\x03')
+
+        s.body = Structure16(value=0xFFFE)
+        s.upper = 0b1100  # 0xC
+        self.assertEqual(s.bits.lower, 0b1010)
+        self.assertEqual(s.lower, s.bits.lower)
+        self.assertEqual(s.upper, s.bits.upper)
+        self.assertEqual(s.pack(), b'\xCA\xFF\xFE')
+
+
 if __name__ == "__main__":
     unittest.main()

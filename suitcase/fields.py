@@ -31,6 +31,7 @@ class FieldPlaceholder(object):
         self.cls = cls
         self.args = args
         self.kwargs = kwargs
+        self.__accessors = {}
 
     def create_instance(self, parent):
         """Create an instance based off this placeholder with some parent"""
@@ -39,6 +40,14 @@ class FieldPlaceholder(object):
         instance = self.cls(*self.args, **self.kwargs)
         instance._field_seqno = self._field_seqno
         return instance
+
+    def __getattr__(self, name):
+        # In case the same field is being referenced more than once.
+        if name in self.__accessors:
+            return self.__accessors[name]
+        accessor = FieldAccessor(self, name)
+        self.__accessors[name] = accessor
+        return accessor
 
 
 class BaseField(object):
@@ -77,6 +86,8 @@ class BaseField(object):
 
     def _ph2f(self, placeholder):
         """Lookup a field given a field placeholder"""
+        if issubclass(placeholder.cls, FieldAccessor):
+            return placeholder.cls.access(self._parent, placeholder)
         return self._parent.lookup_field_by_placeholder(placeholder)
 
     def __repr__(self):
@@ -336,6 +347,19 @@ class DispatchTarget(BaseField):
             body = DispatchTarget(dispatch_field=type, dispatch_mapping={
                 0x00: MessageType0,
                 0x01: MessageType1,
+            })
+
+    Observe that it is also possible to create a DispatchTarget based on
+    a segment of a BitField::
+
+        class MyMessage(Structure):
+            version_and_type = BitField(8,
+                version=BitNum(4),
+                type=BitNum(4)
+            )
+            body = DispatchTarget(None, version_and_type.type, {
+                0x0: MessageType0,
+                0x1: MessageType1,
             })
 
     :param length_provider: The field providing a length value binding this
@@ -1440,3 +1464,60 @@ class BitField(BaseField):
             mask = (2 ** field.size - 1)
             fval = (value >> shift) & mask
             field.setval(fval)
+
+
+class FieldAccessor(BaseField):
+    """Represent attribute access to another field in the structure
+
+    Not meant to be created directly by the user code.
+    Instead, this is created automatically when a pattern like the following
+    is used::
+
+        class S(Structure):
+            bits = BitField(8, top=BitNum(4), bottom=BitNum(4))
+            body = DispatchTarget(None, bits.top, { ... })
+
+    `bits.top` is a FieldAccessor, and is responsible for providing the
+    value of the `top` field of `bits` when asked for, and updating that
+    field when set.
+
+    """
+
+    def __init__(self, field, name, **kwargs):
+        BaseField.__init__(self, field, name, **kwargs)
+        self._field = field
+        self._name = name
+        self.bytes_required = 0
+
+    @classmethod
+    def access(cls, parent, placeholder):
+        """Resolve the deferred field attribute access.
+
+        :param cls: the FieldAccessor class
+        :param parent: owning structure of the field being accessed
+        :param placeholder: FieldPlaceholder object which holds our info
+        :returns: FieldAccessor instance for that field's attribute
+        """
+        try:
+            return parent.lookup_field_by_placeholder(placeholder)
+        except KeyError:
+            field_placeholder, name = placeholder.args
+            # Find the field whose attribute is being accessed.
+            field = parent.lookup_field_by_placeholder(field_placeholder)
+            # Instantiate the real FieldAccessor that wraps the attribute.
+            accessor = cls(field, name, parent=parent, instantiate=True)
+            # Keep this instance alive, and reuse it for future references.
+            parent._placeholder_to_field[placeholder] = accessor
+            return accessor
+
+    def getval(self):
+        return getattr(self._field, self._name)
+
+    def setval(self, value):
+        setattr(self._field, self._name, value)
+
+    def pack(self, stream):  # pragma: no cover
+        pass
+
+    def unpack(self, data, **kwargs):  # pragma: no cover
+        pass
