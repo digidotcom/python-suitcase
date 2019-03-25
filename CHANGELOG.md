@@ -1,5 +1,22 @@
 ## Suitcase Change Log
 
+### 0.11 / 2019-03-25
+
+[Full Changelog](https://github.com/digidotcom/python-suitcase/compare/0.10...0.11)
+
+Enhancements:
+
+* [Added 32-bit and 64-bit float fields][pr-46]
+* [Added support for DispatchTarget over a BitField field][pr-54]
+
+Other Changes:
+
+* [Testing support for Python 3.3, 3.4 and PyPy 2.7 has been dropped][pr-53]
+
+[pr-46]: https://github.com/digidotcom/python-suitcase/pull/46
+[pr-54]: https://github.com/digidotcom/python-suitcase/pull/54
+[pr-53]: https://github.com/digidotcom/python-suitcase/pull/53
+
 ### 0.10 / 2016-10-2016
 
 [Full Changelog](https://github.com/digidotcom/python-suitcase/compare/0.9...0.10)
