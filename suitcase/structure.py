@@ -25,11 +25,13 @@ class Packer(object):
         self.ordered_fields = ordered_fields
 
     def pack(self):
+        # type: () -> bytes
         sio = BytesIO()
         self.write(sio)
         return sio.getvalue()
 
     def write(self, stream):
+        # type: (BytesIO) -> None
         # now, pack everything in
         crc_fields = []
         for name, field in self.ordered_fields:
@@ -60,6 +62,7 @@ class Packer(object):
                 stream.write(checksum_data)
 
     def unpack(self, data, trailing=False):
+        # type: (bytes, bool) -> BytesIO
         stream = BytesIO(data)
         self.unpack_stream(stream)
         stream.tell()
@@ -69,8 +72,10 @@ class Packer(object):
             raise SuitcaseParseError("Structure fully parsed but additional bytes remained.  Parsing "
                                      "consumed %d of %d bytes" %
                                      (stream.tell(), len(data)))
+        return stream
 
     def unpack_stream(self, stream):
+        # type: (BytesIO) -> None
         """Unpack bytes from a stream of data field-by-field
 
         In the most basic case, the basic algorithm here is as follows::
@@ -98,11 +103,8 @@ class Packer(object):
             length = field.bytes_required
             if field.is_substructure():
                 remaining_data = stream.getvalue()[stream.tell():]
-                returned_stream = field.unpack(remaining_data, trailing=True)
-                if returned_stream is not None:
-                    consumed = returned_stream.tell()
-                else:
-                    consumed = 0
+                after_unpack = field.unpack(remaining_data, trailing=True)
+                consumed = len(remaining_data) - len(after_unpack)
                 # We need to fast forward by as much as was consumed by the structure
                 stream.seek(stream.tell() + consumed)
                 continue
@@ -347,7 +349,11 @@ class Structure(object):
         return self._placeholder_to_field[placeholder]
 
     def unpack(self, data, trailing=False):
-        return self._packer.unpack(data, trailing)
+        # type: (bytes, bool) -> BytesIO
+        # If we asked to unpack while leaving any trailing bytes,
+        # make sure to specify it's okay for there to be trailing bytes.
+        return self._packer.unpack(data, trailing=trailing)
 
     def pack(self):
+        # type: () -> bytes
         return self._packer.pack()
