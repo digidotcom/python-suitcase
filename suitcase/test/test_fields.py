@@ -1309,5 +1309,71 @@ class TestFieldAccessorMultiple(unittest.TestCase):
         self.assertEqual(s.pack(), b'\xCA\xFF\xFE')
 
 
+class _InnerDispatchType0(Structure):
+    some_field = UBInt8()
+    cond_sub = SubstructureField(ConditionalSubstructures)
+
+
+class _InnerDispatchType1(Structure):
+    one = UBInt8()
+    two = UBInt8()
+
+
+class _OuterDispatch(Structure):
+    which = DispatchField(UBInt8())
+    # NOTE: This setup will fail if greedy=False is not specified,
+    # indicating that _OuterDispatch didn't consume the remainder of the data.
+    # Because we don't _expect_ it to consume the rest of the data in the message,
+    # we need to mark this as non-greedy.
+    # TODO: We may be able to infer this from field ordering, or apply some heuristic
+    # over the entire structure to correctly find the greedy field (payload at the end,
+    # in this case).
+    dispatch = DispatchTarget(None, which, {
+        0x00: _InnerDispatchType0,
+        0x01: _InnerDispatchType1,
+    }, greedy=False)
+
+
+class SubstructureDispatchFollowedByPayload(Structure):
+    some_value = UBInt8()
+    sub = SubstructureField(_OuterDispatch)
+    another_value = UBInt8()
+    payload = Payload()
+
+
+class TestSubstructureDispatchFollowedByPayload(unittest.TestCase):
+    def test_unpack(self):
+        s = SubstructureDispatchFollowedByPayload.from_data(
+            (
+                # some_value
+                b'\xF7'
+                # sub: _OuterDispatch
+                # - which
+                b'\x00'
+                # - _InnerDispatchType0
+                # -- some_field
+                b'\x7F'
+                # -- cond_sub: ConditionalSubstructures
+                # --- f1=19.
+                b'\x13'
+                # --- f3, 2 bytes.
+                b'\x77\x88'
+                # another_value
+                b'\xE5'
+                # payload
+                b'This is my payload'
+            )
+        )
+
+        self.assertEqual(s.some_value, 0xF7)
+        self.assertEqual(s.sub.which, 0)
+        self.assertEqual(s.sub.dispatch.some_field, 0x7F)
+        self.assertEqual(s.sub.dispatch.cond_sub.f1, 19)
+        self.assertEqual(s.sub.dispatch.cond_sub.f3.b1, 0x77)
+        self.assertEqual(s.sub.dispatch.cond_sub.f3.b2, 0x88)
+        self.assertEqual(s.another_value, 0xE5)
+        self.assertEqual(s.payload, b'This is my payload')
+
+
 if __name__ == "__main__":
     unittest.main()

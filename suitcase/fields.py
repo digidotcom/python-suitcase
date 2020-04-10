@@ -103,6 +103,25 @@ class BaseField(object):
     def setval(self, value):
         self._value = value
 
+    def unpack(self, data, **kwargs):  # type: (bytes, **bool) -> bytes
+        """
+        Given the raw data associated with a field, consume the data and return anything left over.
+        :param data: Raw data to consume
+        :returns: Remaining data
+        """
+        raise NotImplementedError("Field class must implement unpack.")
+
+    @property
+    def is_greedy(self):  # type: () -> bool
+        """
+        Should the parser consider this field to be greedy, i.e. that it wants to consume
+        all remaining data in the input?
+
+        This property currently is only meaningful on ``DispatchTarget``,
+        where passing greedy=False allows for nested DispatchTarget structures.
+        """
+        return True
+
 
 class CRCField(BaseField):
     r"""Field representing CRC (Cyclical Redundancy Check) in a message
@@ -191,7 +210,7 @@ class CRCField(BaseField):
         stream.write(b'\x00' * self.field.bytes_required)
 
     def unpack(self, data, **kwargs):
-        self.field.unpack(data, **kwargs)
+        return self.field.unpack(data, **kwargs)
 
 
 class Magic(BaseField):
@@ -216,6 +235,7 @@ class Magic(BaseField):
             raise SuitcaseParseError(
                 "Expected sequence %r for magic field but got %r on "
                 "message %r" % (self.expected_sequence, data, self._parent))
+        return b''
 
     def __repr__(self):
         return "Magic(%r)" % (self.expected_sequence,)
@@ -286,7 +306,7 @@ class FieldProperty(BaseField):
         self.field.setval(onset(value))
 
     def unpack(self, data, **kwargs):
-        pass
+        return data
 
     def pack(self, stream):
         pass
@@ -369,11 +389,16 @@ class DispatchTarget(BaseField):
         possible values for this field act as the keys for the dispatch.
     :param dispatch_mapping: This is a dictionary mapping dispatch_field
         values to associated message types to handle the remaining processing.
+    :param greedy: If True (the default), the parser can assume that this field
+        consumes all remaining data in the input. If False, the parser will only
+        consume as much data as necessary to create the structure.
+        This comes in handy when a DispatchTarget is inside of a substructure or another
+        DispatchTarget, and is not the last field of the message.
 
     """
 
     def __init__(self, length_provider, dispatch_field,
-                 dispatch_mapping, **kwargs):
+                 dispatch_mapping, greedy=True, **kwargs):
         BaseField.__init__(self, **kwargs)
         if length_provider is None:
             self.length_provider = None
@@ -384,6 +409,7 @@ class DispatchTarget(BaseField):
         self.dispatch_mapping = dispatch_mapping
         self.inverse_dispatch_mapping = dict((v, k) for (k, v)
                                              in dispatch_mapping.items())
+        self.__greedy = greedy
 
     def _lookup_msg_type(self):
         target_key = self.dispatch_field.getval()
@@ -392,6 +418,10 @@ class DispatchTarget(BaseField):
             target = self.dispatch_mapping.get(None, None)
 
         return target
+
+    @property
+    def is_greedy(self):
+        return self.__greedy
 
     @property
     def bytes_required(self):
@@ -429,7 +459,7 @@ class DispatchTarget(BaseField):
                                      " contained in mapping")
         message_instance = target_msg_type()
         self.setval(message_instance)
-        self._value.unpack(data)
+        return self._value.unpack(data, trailing=not self.is_greedy).read()
 
 
 class LengthField(BaseField):
@@ -652,6 +682,7 @@ class ConditionalField(BaseField):
     def unpack(self, data, **kwargs):
         if self.condition(self._parent):
             return self.field.unpack(data, **kwargs)
+        return data
 
     def getval(self):
         if not self.condition(self._parent):
@@ -705,6 +736,8 @@ class Payload(BaseField):
 
     def unpack(self, data, **kwargs):
         self._value = data
+        assert self.bytes_required is None or len(data) == self.bytes_required
+        return b''
 
 
 # keep for backwards compatibility
@@ -790,7 +823,7 @@ class DependentField(BaseField):
         pass
 
     def unpack(self, data, **kwargs):
-        pass
+        return data
 
     def getval(self):
         return self._get_parent_field().getval()
@@ -853,7 +886,7 @@ class SubstructureField(BaseField):
 
     def unpack(self, data, **kwargs):
         self._value = self.substructure()
-        return self._value.unpack(data, **kwargs)
+        return self._value.unpack(data, **kwargs).read()
 
 
 class FieldArray(BaseField):
@@ -963,6 +996,8 @@ class BaseFixedByteSequence(BaseField):
     def unpack(self, data, **kwargs):
         try:
             self._value = struct.unpack(self.format, data)
+            assert len(data) == self.bytes_required
+            return b''
         except struct.error as e:
             raise SuitcasePackStructException(e)
 
@@ -1028,6 +1063,8 @@ class BaseStructField(BaseField):
             for i, byte in enumerate(struct.unpack(self.UNPACK_FORMAT, data)):
                 value |= (byte << (i * 8))
         self._value = value
+        assert len(data) == self.bytes_required
+        return b''
 
 
 # ==============================================================================
