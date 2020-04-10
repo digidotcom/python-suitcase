@@ -120,12 +120,11 @@ class Packer(object):
                     break
             else:
                 data = stream.read(length)
-                if field.is_greedy and len(data) != length:
+                if length is not None and len(data) != length:
                     raise SuitcaseParseError("While attempting to parse field "
                                              "%r we tried to read %s bytes but "
                                              "we were only able to read %s." %
                                              (name, length, len(data)))
-                # For non-greedy fields with length None, we can't enforce a particular length here.
 
             try:
                 unused_data = field.unpack(data)
