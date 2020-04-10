@@ -108,7 +108,10 @@ class Packer(object):
                 # We need to fast forward by as much as was consumed by the structure
                 stream.seek(stream.tell() + consumed)
                 continue
-            elif length is None:
+            elif length is None and field.is_greedy:
+                # If length is None, this is assumed to be a greedy field.
+                # But we check is_greedy so that non-greedy fields are supported.
+
                 if isinstance(field, FieldArray) and field.num_elements is not None:
                     # Read the data greedily now, and we'll backtrack after enough elements have been read.
                     data = stream.read()
@@ -117,15 +120,16 @@ class Packer(object):
                     break
             else:
                 data = stream.read(length)
-                if len(data) != length:
+                if field.is_greedy and len(data) != length:
                     raise SuitcaseParseError("While attempting to parse field "
                                              "%r we tried to read %s bytes but "
                                              "we were only able to read %s." %
                                              (name, length, len(data)))
+                # For non-greedy fields with length None, we can't enforce a particular length here.
 
             try:
                 unused_data = field.unpack(data)
-                stream.seek(-len(unused_data or ""), os.SEEK_CUR)
+                stream.seek(-len(unused_data or b""), os.SEEK_CUR)
             except SuitcaseException:
                 raise  # just re-raise these
             except Exception:
