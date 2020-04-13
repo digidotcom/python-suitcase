@@ -1375,5 +1375,57 @@ class TestSubstructureDispatchFollowedByPayload(unittest.TestCase):
         self.assertEqual(s.payload, b'This is my payload')
 
 
+class FieldArrayWithDependentField(Structure):
+    length = UBInt8()
+    # Each entry in the array has a payload of length `length`
+    entries = FieldArray(MyTargetMessage)
+
+
+class SubstructureWithDependentField(Structure):
+    length = UBInt16()
+    sub = SubstructureField(MyTargetMessage)
+
+
+class TestFieldArrayWithDependentField(unittest.TestCase):
+    def test_unpack(self):
+        data = (
+            b"\x05"  # each message is 5 bytes
+            b"Hello"
+            b"World"
+            b"Digi!"
+        )
+        structure = FieldArrayWithDependentField.from_data(data)
+        self.assertEqual(len(structure.entries), 3)
+        self.assertEqual(5, structure.length)
+        self.assertEqual(structure.entries[0].payload, b"Hello")
+        self.assertEqual(structure.entries[1].payload, b"World")
+        self.assertEqual(structure.entries[2].payload, b"Digi!")
+
+    @unittest.expectedFailure
+    def test_dependent_field_automatically_updates(self):
+        structure = FieldArrayWithDependentField()
+        structure.entries.append(MyTargetMessage(payload=b"ABC"))
+        self.assertEqual(3, structure.length)
+
+
+class TestSubstructureWithDependentField(unittest.TestCase):
+    def test_unpack(self):
+        data = (
+            b"\x00\x08"
+            b"Hello..."
+        )
+        structure = SubstructureWithDependentField.from_data(data)
+        self.assertEqual(structure.length, 8)
+        self.assertEqual(structure.sub.payload, b"Hello...")
+
+    @unittest.expectedFailure
+    def test_auto_assignment_of_dependent_field(self):
+        data = b"\x00\x01A"
+        structure = SubstructureWithDependentField.from_data(data)
+        structure.sub.payload = b"Hello, World!"
+        # We would probably expect this to work! But it does not. :(
+        self.assertEqual(structure.length, 13)
+
+
 if __name__ == "__main__":
     unittest.main()

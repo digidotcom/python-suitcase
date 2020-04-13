@@ -872,6 +872,7 @@ class SubstructureField(BaseField):
         BaseField.__init__(self, **kwargs)
         self.substructure = substructure
         self._value = substructure()
+        self._value._parent = self._parent
 
     def is_substructure(self):
         return True
@@ -886,6 +887,7 @@ class SubstructureField(BaseField):
 
     def unpack(self, data, **kwargs):
         self._value = self.substructure()
+        self._value._parent = self._parent
         return self._value.unpack(data, **kwargs).read()
 
 
@@ -965,6 +967,7 @@ class FieldArray(BaseField):
         kwargs['trailing'] = True
         while True:
             structure = self.substructure()
+            structure._parent = self._parent
             data = structure.unpack(data, **kwargs).read()
             self._value.append(structure)
             if data == b"":
