@@ -1374,6 +1374,26 @@ class TestSubstructureDispatchFollowedByPayload(unittest.TestCase):
         self.assertEqual(s.another_value, 0xE5)
         self.assertEqual(s.payload, b'This is my payload')
 
+    def test_pack(self):
+        sub_dispatch = _InnerDispatchType0(
+            some_field=0x01,
+            cond_sub=ConditionalSubstructures(
+                f1=11,
+                f3=BasicMessage(
+                    b1=0x01,
+                    b2=0x02,
+                )
+            )
+        )
+        structure = SubstructureDispatchFollowedByPayload()
+        structure.some_value = 0xFE
+        structure.another_value = 0xE5
+        structure.payload = b"Hello World!"
+        structure.sub.dispatch = sub_dispatch
+
+        self.assertEqual(structure.pack(),
+                         b"\xFE\x00\x01\x0B\x01\x02\xE5Hello World!")
+
 
 class FieldArrayWithDependentField(Structure):
     length = UBInt8()
