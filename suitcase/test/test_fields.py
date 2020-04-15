@@ -1474,5 +1474,42 @@ class TestMultipleGreedyFields(unittest.TestCase):
         self.assertEqual(structure.pack(), b"Hello,\x00World!")
 
 
+class GreedyPayloadFollowedByNongreedyDispatch(Structure):
+    payload = Payload()
+    _nul = Magic(b'\x00')
+    kind = DispatchField(UBInt8())
+    rest = DispatchTarget(None, kind, {
+        0x00: BasicMessage,
+        0x01: MySimpleFixedPayload,
+    }, greedy=False)
+
+
+class TestGreedyPayloadFollowedByNongreedyDispatch(unittest.TestCase):
+    def test_cannot_unpack(self):
+        data = (
+            b"Hello, World!"
+            b"\x00"
+            b"\x01"
+            b"\xDE\xAD\xBE\xEF"
+        )
+        # Suitcase does not know how to handle a greedy field that is followed
+        # by a nongreedy dispatch target. (If the length of the dispatch target
+        # is indeterminate, the unpack process will feed the entire message in,
+        # which obviously is not what we want.) The solution to this would be
+        # to be able to direct Suitcase to parse the fields left-to-right, since
+        # in this case the greedy payload is "boxed" by a null terminator.
+        # But if that terminator was not present, this structure would be
+        # impossible to parse anyway.
+        self.assertRaises(SuitcaseParseError,
+                          GreedyPayloadFollowedByNongreedyDispatch.from_data,
+                          data)
+
+    def test_pack(self):
+        structure = GreedyPayloadFollowedByNongreedyDispatch()
+        structure.payload = b"Hello!"
+        structure.rest = MySimpleFixedPayload(number=0xDEADBEEF)
+        self.assertEqual(structure.pack(), b"Hello!\x00\x01\xDE\xAD\xBE\xEF")
+
+
 if __name__ == "__main__":
     unittest.main()
