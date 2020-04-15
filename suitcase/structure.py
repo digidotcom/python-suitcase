@@ -95,6 +95,7 @@ class Packer(object):
         """
         crc_fields = []
         greedy_field = None
+        greedy_field_name = None
         # go through the fields from first to last.  If we hit a greedy
         # field, break out of the loop
         for i, (name, field) in enumerate(self.ordered_fields):
@@ -117,6 +118,7 @@ class Packer(object):
                     data = stream.read()
                 else:
                     greedy_field = field
+                    greedy_field_name = name
                     break
             else:
                 data = stream.read(length)
@@ -149,6 +151,14 @@ class Packer(object):
                     crc_fields.append(
                         (field, -inverted_stream.tell() - field.bytes_required))
                 length = field.bytes_required
+                if length is None and field.is_greedy:
+                    raise SuitcaseParseError(
+                        "While attempting to parse greedy field %r we found "
+                        "another greedy field, %r. There can only be one greedy"
+                        "field." %
+                        (greedy_field_name, _name)
+                    )
+
                 data = inverted_stream.read(length)[::-1]
                 if len(data) != length:
                     raise SuitcaseParseError("While attempting to parse field "

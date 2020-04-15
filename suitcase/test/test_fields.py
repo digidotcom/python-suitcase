@@ -1447,5 +1447,32 @@ class TestSubstructureWithDependentField(unittest.TestCase):
         self.assertEqual(structure.length, 13)
 
 
+class MultipleGreedyFields(Structure):
+    # TODO: Ideally we could do this particular example?
+    payload1 = Payload()
+    magic = Magic(b'\x00')
+    payload2 = Payload()
+
+
+class TestMultipleGreedyFields(unittest.TestCase):
+    def test_unpack(self):
+        with self.assertRaises(SuitcaseParseError) as caught:
+            MultipleGreedyFields.from_data(
+                b"Hello\0World"
+            )
+        self.assertIn(
+            "found another greedy field", str(caught.exception),
+            "Suitcase is not expected to support multiple greedy fields")
+
+    def test_pack(self):
+        # Even though we can't unpack such a structure, we can construct
+        # and pack it.
+        structure = MultipleGreedyFields(
+            payload1=b"Hello,",
+            payload2=b"World!",
+        )
+        self.assertEqual(structure.pack(), b"Hello,\x00World!")
+
+
 if __name__ == "__main__":
     unittest.main()
