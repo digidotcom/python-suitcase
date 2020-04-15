@@ -1,5 +1,22 @@
 ## Suitcase Change Log
 
+### 0.12 / 2020-04-15
+
+[Full Changelog](https://github.com/digidotcom/python-suitcase/compare/0.11...0.12)
+
+Enhancements:
+
+* Added support for non-greedy DispatchTargets, so that such fields can be
+  appear in a structure before a greedy field (e.g. Payload) without error.
+
+Bugfixes:
+
+* Previously, `DependentField` would not work if it appeared within a
+  `SubstructureField` or a `FieldArray`. This has been corrected.
+* Updated the `unpack` method of fields and structures to ensure consistent
+  return types. Previously, some fields would return None while others would
+  return the unused data; now fields should always return non-None.
+
 ### 0.11 / 2019-03-25
 
 [Full Changelog](https://github.com/digidotcom/python-suitcase/compare/0.10...0.11)

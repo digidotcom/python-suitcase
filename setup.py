@@ -40,7 +40,7 @@ def get_long_description():
 
 setup(
     name='suitcase',
-    version='0.11.0',
+    version='0.12.0',
     url="https://github.com/digidotcom/python-suitcase",
     description='A library for specifying/parsing/packing binary protocols',
     long_description=get_long_description(),
